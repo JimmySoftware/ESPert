@@ -32,6 +32,10 @@ static String ssidHeader = "";
 static String ssidFooter = "";
 static String content = "";
 
+// rx tx buffer
+static String _readString;
+
+static PubSubClient *mqtt_client = NULL;
 
 ESPert::ESPert()
 {
@@ -64,6 +68,10 @@ void ESPert::loop() {
       wifi.setAutoConnect( true );
     }
   }  
+  if( mqtt_client ) {  
+    mqtt.connect();
+  }
+
 }
 
 #if ARDUINO >= 100
@@ -125,7 +133,7 @@ int ESPert_LED::get() {
 // ****************************************
 String ESPert::getId() {
   char textID[16];
-  sprintf(textID, "ESPERT-%lu", ESP.getChipId());
+  sprintf(textID, "ESPert-%lu", ESP.getChipId());
   return String(textID);
 }
 
@@ -375,18 +383,25 @@ void ESPert_OLED::println(int i) {
 // ****************************************
 // HUTMP class
 // ****************************************
-void ESPert_DHT::init( int p, int t ) {
+void ESPert_DHT::init( int pin, int type ) {
+    if( pin == -1 )
+        pin_dht = ESPERT_PIN_DHT;
+    else
+        pin_dht = pin;
+        
+    if( type == -1 )
+        dht_type = ESPERT_DHT_TYPE;
+    else
+        dht_type = type;
+        
+    int tx = 15;
+    if( dht_type == DHT22 ) 
+        tx = 30;
+        
   if (!isReady()) {
     dht = NULL;
 
-    int pin;
-    if( p == -1 )
-        pin = ESPERT_PIN_DHT;
-    int type;
-    if( t == -1 )
-        type = ESPERT_DHT_TYPE;
-        
-    dht = new DHT(pin, type, 15);
+    dht = new DHT(pin_dht, dht_type, tx);
     dht->begin();
   }
 }
@@ -908,3 +923,325 @@ void ESPert_GroveRelay::set(bool state) {
 int ESPert_GroveRelay::get() {
     return !ESPert_LED::get();
 }
+
+
+void ESPert_MQTT::init( IPAddress server, int port )
+{
+    callback = NULL;
+    IPAddress mqtt_server = server;
+    mqtt_client = new PubSubClient(mqtt_server, port);
+}
+
+void ESPert_MQTT::init( String server, int port )
+{
+    callback = NULL;
+    String mqtt_server = server;
+    mqtt_client = new PubSubClient(mqtt_server, port);
+}
+
+PubSubClient *ESPert_MQTT::getPubSubClient()
+{
+    return mqtt_client;
+}
+
+String ESPert_MQTT::getClientName()
+{
+    String clientName;
+    uint8_t mac[6];
+
+    clientName += "ESPert-";
+    WiFi.macAddress(mac);
+    clientName += macToStr(mac);
+    clientName += "-";
+    clientName += String(micros() & 0xff, 16);  
+    return clientName;
+}
+
+void ESPert_MQTT::publish( String topic, String value )
+{
+    // Publish temperature
+    if( mqtt_client ) {
+        mqtt_client->publish(topic, (char *) value.c_str());
+    }
+}
+
+void ESPert_MQTT::subscribe( String topic )
+{
+    if( mqtt_client ) {
+        _espert->println( "Subscribe: " + topic );
+        mqtt_client->subscribe(topic);
+    }
+}
+
+void ESPert_MQTT::setCallback(PubSubClient::callback_t cb) {
+    callback = cb;
+}
+
+/* MQTT server connection */
+void ESPert_MQTT::connect() {
+  // add reconnection logics
+  if (!mqtt_client->connected()) {
+    mqtt_client->set_callback(callback);
+
+    // connection to MQTT server
+    String cn = getClientName();
+    if (mqtt_client->connect((char *)cn.c_str())) 
+    {
+      Serial.println("[PHYSICAL] Successfully connected with MQTT");
+      //Serial.print( "Server: " );
+      //Serial.println( mqtt_client->server_hostname );
+      Serial.print( "Client ID: " );
+      Serial.println( cn );
+    }
+  }
+  mqtt_client->loop();
+}
+
+ESPert_SoftwareSerial::ESPert_SoftwareSerial()
+{
+    swSerial = NULL;
+}
+
+void ESPert_SoftwareSerial::init( int rx, int tx, int buffer )
+{
+    swSerial = new SoftwareSerial( rx, tx, buffer );
+    
+
+}
+
+String ESPert_SoftwareSerial::readString()
+{
+  _readString = "";
+  while (swSerial && swSerial->available()) {
+    char c = swSerial->read();  //gets one byte from serial buffer
+    _readString += c; //makes the string _readString
+    delay(5);  //slow looping to allow buffer to fill with next character
+  }
+  if( _readString.length() > 0 )
+    return _readString;
+  return String("");
+}
+/*
+
+void ESPert_SoftwareSerial::write( String str ) {
+  for( int i=0; i<str.length(); i++ ) {
+    swSerial->write(str[i]);
+  }
+}
+*/
+size_t ESPert_SoftwareSerial::write(uint8_t b) {
+    swSerial->write( b );
+}
+
+int ESPert_SoftwareSerial::read()
+{
+    return swSerial->read();
+}
+
+int ESPert_SoftwareSerial::available()
+{
+    return swSerial->available();
+}
+
+void ESPert_SoftwareSerial::flush()
+{
+    swSerial->flush();
+}
+
+int ESPert_SoftwareSerial::peek()
+{
+    swSerial->peek();
+}
+
+void ESPert_SoftwareSerial::begin( int baud )
+{
+    swSerial->begin( baud);
+    
+    for (char ch = ' '; ch <= 'z'; ch++) {
+        swSerial->write(ch);
+    }
+    swSerial->println("");
+
+    _readString = "";
+}
+
+
+
+bool ESPert_BLE::init( ESPert_SoftwareSerial *swSer )
+{
+  swSerial = swSer;
+    
+  swSerial->write( "AT" );
+  delay( 100 );
+
+  _readString = swSerial->readString();
+  _espert->println( _readString );
+  _espert->println( "***" );
+  if( _readString == "OK" )
+  {
+    delay( 100 );
+    return true;
+  }
+  return false;
+}
+
+String ESPert_BLE::getFirmwareVersion()
+{
+  swSerial->write( "AT+VERR?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    return _readString.substring(7);
+  }
+  return "(unknown)";
+}
+
+bool ESPert_BLE::isOn()
+{
+  swSerial->write( "AT+IBEA?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    _espert->println( _readString );
+    if( _readString == "OK+Get:1" ) {
+      delay( 100 );
+      return true;
+    }
+    else if( _readString == "OK+Get:0" ){
+      delay( 100 );
+      return false;
+    }
+  }
+  _espert->println( "Unknown command\n" );  
+  return false;
+
+}
+
+bool ESPert_BLE::on()
+{
+  swSerial->write( "AT+IBEA1" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    _espert->println( _readString );
+    if( _readString == "OK+Set:1" ) {
+      delay( 100 );
+      return true;
+    }
+    else if( _readString == "OK+Set:0" ){
+      delay( 100 );
+      return false;
+    }
+  }
+  _espert->println( "Unknown command\n" );  
+  return false;
+}
+
+bool ESPert_BLE::off()
+{
+  swSerial->write( "AT+IBEA0" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    _espert->println( _readString );
+    if( _readString == "OK+Set:0" ) {
+      delay( 100 );
+      return true;
+    }
+    else if( _readString == "OK+Set:1" ){
+      delay( 100 );
+      return false;
+    }
+  }
+  _espert->println( "Unknown command\n" );  
+  return false;
+}
+
+
+String ESPert_BLE::getUUID()
+{
+  String UUID = "";
+  swSerial->write( "AT+IBE0?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    _espert->println( _readString.substring( 7 ) );
+    UUID += _readString.substring( 9 );
+  }
+  swSerial->write( "AT+IBE1?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    _espert->println( _readString.substring( 7 ) );
+    UUID += _readString.substring( 9 );
+  }
+  swSerial->write( "AT+IBE2?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    _espert->println( _readString.substring( 7 ) );
+    UUID += _readString.substring( 9 );
+  }
+  swSerial->write( "AT+IBE3?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    _espert->println( _readString.substring( 7 ) );
+    UUID += _readString.substring( 9 );
+  }
+
+  
+  return UUID;
+}
+
+
+int ESPert_BLE::getMajor()
+{
+  swSerial->write( "AT+MARJ?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    //_espert->println( _readString );
+    int l = strtol( _readString.substring(9).c_str(), NULL, 16 );
+    return l;
+  }
+  return -1;
+}
+
+int ESPert_BLE::getMinor()
+{
+  swSerial->write( "AT+MINO?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    //_espert->println( _readString );
+    int l = strtol( _readString.substring(9).c_str(), NULL, 16 );
+    return l;
+  }
+  return -1;
+}
+
+int ESPert_BLE::getTXPower()
+{
+  swSerial->write( "AT+MEAS?" );
+  delay( 100 );
+  _readString = swSerial->readString();
+  if( _readString.length() != 0 )
+  {
+    //_espert->println( _readString );
+    int l = strtol( _readString.substring(9).c_str(), NULL, 16 );
+    return l;
+  }
+  return -1;
+}
+

@@ -9,6 +9,8 @@
 #include <Adafruit_GFX.h>
 #include <Wire.h>
 #include <DHT.h>
+#include <SoftwareSerial.h>
+#include <PubSubClient.H>
 
 static const float ESPERT_LIBRARY_VERSION = 0.8f;
 
@@ -149,6 +151,7 @@ class ESPert_DHT
     bool hutmp;
     DHT *dht;
     int pin_dht;
+    int dht_type;
 
   public:
     void init( int pin=-1, int type=-1 );
@@ -156,6 +159,62 @@ class ESPert_DHT
     int getHumidity();
     int getTemperature();
 };
+
+class ESPert_SoftwareSerial : public Stream
+{
+    public:
+        ESPert_SoftwareSerial();
+        void init( int rx=12, int tx=14, int buffer=128 );
+        String readString();
+        //void write( String str );
+        virtual size_t write(uint8_t byte);
+        virtual int read();
+        virtual int available();
+        virtual void flush();
+        int peek();
+
+        void begin( int baud=9600 );
+        
+        SoftwareSerial  *swSerial;
+        
+        using Print::write;
+
+};
+
+class ESPert_BLE 
+{
+    ESPert_SoftwareSerial *swSerial;
+    
+    public:
+        bool init( ESPert_SoftwareSerial *swSer );
+        String getFirmwareVersion();
+        bool isOn();
+        bool on();
+        bool off();
+        
+        String getUUID();
+        int getMajor();
+        int getMinor();
+        int getTXPower();
+
+};
+
+class ESPert_MQTT
+{
+    PubSubClient::callback_t callback;
+    
+    public:
+        void init( IPAddress server, int port );
+        void init( String server, int port );
+        void setCallback( PubSubClient::callback_t cb=NULL );
+        
+        String getClientName();
+        void publish( String topic, String value );
+        void subscribe( String topic );
+        void connect();
+        PubSubClient * getPubSubClient(); 
+};
+
 
 class ESPert : public Print
 {
@@ -167,6 +226,9 @@ class ESPert : public Print
         ESPert_OLED     OLED;
         ESPert_DHT      DHT;
         ESPert_WiFi     wifi;
+        ESPert_SoftwareSerial   swSerial;
+        ESPert_BLE              ble;
+        ESPert_MQTT             mqtt;
         
         String EEPROM_Read( int index, int length );
         int EEPROM_Write( int index, String text );
