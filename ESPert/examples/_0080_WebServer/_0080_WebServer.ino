@@ -1,6 +1,3 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
 #include <ESPert.h>
 
 ESPert espert;
@@ -25,6 +22,7 @@ void init_server()
 
 void setup() {
   espert.init();
+  espert.DHT.init();
   espert.OLED.init();
 
   espert.OLED.clear();
@@ -48,9 +46,9 @@ void loop() {
   // put your main code here, to run repeatedly:
   espert.loop();
 
-    if (server) {
+  if (server) {
     server->handleClient();
   }
 
-  delay(1000);
+  delay(100);
 }

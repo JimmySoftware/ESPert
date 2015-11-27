@@ -1,6 +1,3 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
 #include <ESPert.h>
 
 ESPert espert;
@@ -10,7 +7,7 @@ String outTopic     = "ESPert/" + String(espert.getChipId()) + "/DHT";
 
 // MQTT server address
 IPAddress mqtt_server(192,168,77,1);
-//char* mqtt_server = "mqtt.tespa.io";
+//char* mqtt_server = "mqtt.espert.io";
 
 bool bWebOK = false;
  

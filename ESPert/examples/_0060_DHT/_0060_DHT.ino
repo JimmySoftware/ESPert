@@ -1,6 +1,3 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
 #include <ESPert.h>
 
 ESPert espert;
@@ -10,9 +7,10 @@ void setup() {
   espert.init();
   // Use espert.DHT.init( gpio, type );
   // Type can be DHT11 or DHT22
+  // Defualt will use DHT22 on GPIO12
   espert.DHT.init();
+  
   espert.OLED.init();
-
   espert.OLED.clear();
 }
 
