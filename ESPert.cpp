@@ -1,77 +1,38 @@
 #include "ESPert.h"
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
-#include <EEPROM.h>
 
-static int _boardType = ESPERT_BOARD_GENERIC;
+static ESPert *_espert = NULL;
 
-static int ESPERT_PIN_LED = 16;
-static int ESPERT_PIN_BUTTON = 2;
-static int ESPERT_PIN_SDA = 4;
-static int ESPERT_PIN_SCL = 5;
-static int ESPERT_PIN_DHT = 12;
-
-static int ESPERT_DHT_TYPE = DHT22;
-
-static const long ESPertFlashID[3] = {0x1640EF, 0x1340C8, 0x1340EF}; // Little Endian
-static const String ESPertFlashDesc[3] = {"WINBOND W25Q32: 32M-bit / 4M-byte", "GIGADEVICE GD25Q40 4M-bit / 512K-byte", "WINBOND W25Q40 4M-bit / 512K-byte"};
-
-static ESPert *_espert;
-static ESP8266WebServer *server = NULL;
-static MDNSResponder mdns;
-
-static String networks[MAX_NETWORKS] = {""};
-static int numberOfNetworks = 0;
-
-static String ssid = "";
-static String pass = "";
-static String contentHeader = "";
-static String contentFooter = "";
-static String ssidHeader = "";
-static String ssidFooter = "";
-static String content = "";
-
-// rx tx buffer
-static String _readString;
-
-static PubSubClient *mqtt_client = NULL;
-
-ESPert::ESPert()
-{
-    _espert = this;
+ESPert::ESPert() {
+  _espert = this;
 }
 
-void ESPert::init(int type)
-{
-    Serial.begin(115200);
-    Serial.println();
+void ESPert::init(int type) {
+  ESPertBoardType = type;
 
-    _boardType = type;
-    
-    wdt_disable();
-    wdt_enable(WDTO_8S);
+  Serial.begin(115200);
+  EEPROM.begin(512);
 
-    LED.init();
-    
-    button.init();
+  wdt_disable();
+  wdt_enable(WDTO_8S);
+
+  led.init();
+  button.init();
+
+  delay(1500);
 }
 
 void ESPert::loop() {
-  if( button.isLongPress() ) {
-    println( "Button: Long Pressed" );
+  if (button.isLongPress()) {
+    button.resetPressTime();
+    println("ESPert: Long pressed!");
     int mode = wifi.getMode();
-    if( mode == ESPERT_WIFI_MODE_CONNECT ) {
-      wifi.setAutoConnect( false );
-    }
-    else if( mode == ESPERT_WIFI_MODE_DISCONNECT ) {
-      wifi.setAutoConnect( true );
-    }
-  }  
-  if( mqtt_client ) {  
-    mqtt.connect();
-  }
 
+    if (mode == ESPERT_WIFI_MODE_CONNECT) {
+      wifi.setAutoConnect(false);
+    } else if (mode == ESPERT_WIFI_MODE_DISCONNECT) {
+      wifi.setAutoConnect(true);
+    }
+  }
 }
 
 #if ARDUINO >= 100
@@ -79,60 +40,23 @@ size_t ESPert::write(uint8_t c) {
 #else
 void ESPert::write(uint8_t c) {
 #endif
-    if (c == '\n') {
-        Serial.println();
-    } else if (c == '\r') {
-        // skip em
-    } else {
-        Serial.print( (char)c );
-    }
+  if (c == '\n') {
+    Serial.println();
+  } else if (c == '\r') {
+    // skip em
+  } else {
+    Serial.print((char)c);
+  }
 #if ARDUINO >= 100
-    return 1;
+  return 1;
 #endif
-}
-
-// ****************************************
-// LED class
-// ****************************************
-void ESPert_LED::init( int pin ) {
-    if( pin == -1 )
-        pin_LED = ESPERT_PIN_LED;
-    else
-        pin_LED = pin;
-        
-    pinMode( pin_LED, OUTPUT );
-    off();
-}
-
-void ESPert_LED::on() {
-    set(true);
-}
-
-void ESPert_LED::off() {
-    set(false);
-}
-
-void ESPert_LED::set(bool state) {
-    if (_boardType == ESPERT_BOARD_ESP201) {
-        digitalWrite(pin_LED, (state ? HIGH : LOW));
-    } else {
-        digitalWrite(pin_LED, (state ? LOW : HIGH));
-    }
-}
-
-int ESPert_LED::get() {
-    if (_boardType == ESPERT_BOARD_ESP201) {
-        return( digitalRead(pin_LED) == 1 ? 1 : 0 );
-    } else {
-        return( digitalRead(pin_LED) == 1 ? 0 : 1 );
-    }
 }
 
 // ****************************************
 // Device Info
 // ****************************************
 String ESPert::getId() {
-  char textID[16];
+  char textID[16] = {'\0'};
   sprintf(textID, "ESPert-%lu", ESP.getChipId());
   return String(textID);
 }
@@ -155,15 +79,15 @@ uint32_t ESPert::getFlashChipId() {
 
 String ESPert::getFlashChipInfo() {
   int flashChipID = ESP.getFlashChipId();
-  ESPERT_INFO_PRINT(flashChipID, HEX);
+  int arraySize = (sizeof(ESPertFlashID) / sizeof(*ESPertFlashID));
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < arraySize; i++) {
     if (ESP.getFlashChipId() == ESPertFlashID[i]) {
       return ESPertFlashDesc[i];
     }
   }
 
-  return "(Unknown Flash Chip)";
+  return "Unknown Flash Chip";
 }
 
 uint32_t ESPert::getFlashChipRealSize() {
@@ -182,7 +106,7 @@ uint32_t ESPert::getFlashChipSizeByChipId() {
   return ESP.getFlashChipSizeByChipId();
 }
 
-String macToStr(const uint8_t* mac) {
+String ESPert::macToString(const uint8_t* mac) {
   String result = "";
 
   for (int i = 0; i < 6; i++) {
@@ -197,79 +121,541 @@ String macToStr(const uint8_t* mac) {
 }
 
 // ****************************************
-// button class
+// SoftwareSerial class
 // ****************************************
-void ESPert_Button::init( int pin ) {
-    if( pin == -1 )
-        pin_button = ESPERT_PIN_BUTTON;
-    else
-        pin_button = pin;
-        
-    pinMode( pin_button, INPUT_PULLUP);
+ESPert_SoftwareSerial::ESPert_SoftwareSerial() {
+  swSerial = NULL;
+}
 
-    currentButtonStatus = false;
-    buttonPressTime = millis();
+void ESPert_SoftwareSerial::init(int rx, int tx, int buffer) {
+  if (swSerial) {
+    delete swSerial;
+    swSerial = NULL;
+  }
+
+  swSerial = new SoftwareSerial(rx, tx, buffer);
+}
+
+String ESPert_SoftwareSerial::readString() {
+  ESPertReadString = "";
+
+  while (swSerial && swSerial->available()) {
+    char c = swSerial->read();  //gets one byte from serial buffer
+    ESPertReadString += c; //makes the string ESPertReadString
+    delay(5);  //slow looping to allow buffer to fill with next character
+  }
+
+  if (ESPertReadString.length() > 0) {
+    return ESPertReadString;
+  }
+
+  return String("");
+}
+
+size_t ESPert_SoftwareSerial::write(uint8_t b) {
+  swSerial->write(b);
+}
+
+int ESPert_SoftwareSerial::read() {
+  return swSerial->read();
+}
+
+int ESPert_SoftwareSerial::available() {
+  return swSerial->available();
+}
+
+void ESPert_SoftwareSerial::flush() {
+  swSerial->flush();
+}
+
+int ESPert_SoftwareSerial::peek() {
+  swSerial->peek();
+}
+
+void ESPert_SoftwareSerial::begin(int baud) {
+  swSerial->begin(baud);
+
+  for (char ch = ' '; ch <= 'z'; ch++) {
+    swSerial->write(ch);
+  }
+
+  swSerial->println("");
+  ESPertReadString = "";
+}
+
+// ****************************************
+// BLE class
+// ****************************************
+ESPert_BLE::ESPert_BLE() {
+  swSerial = NULL;
+}
+
+bool ESPert_BLE::init(ESPert_SoftwareSerial *swSer) {
+  swSerial = swSer;
+
+  if (swSerial) {
+    swSerial->write("AT");
+    delay(100);
+
+    ESPertReadString = swSerial->readString();
+    _espert->println("ESPert: " + ESPertReadString);
+
+    if (ESPertReadString == "OK") {
+      delay(100);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+String ESPert_BLE::getFirmwareVersion() {
+  if (swSerial) {
+    swSerial->write("AT+VERR?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      return ESPertReadString.substring(7);
+    }
+  }
+
+  return "Unknown";
+}
+
+bool ESPert_BLE::isOn() {
+  if (swSerial) {
+    swSerial->write("AT+IBEA?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      _espert->println("ESPert: " + ESPertReadString);
+      if (ESPertReadString == "OK+Get:1") {
+        delay(100);
+        return true;
+      } else if (ESPertReadString == "OK+Get:0") {
+        delay(100);
+        return false;
+      }
+    }
+  }
+
+  _espert->println("ESPert: Unknown command!");
+  return false;
+}
+
+bool ESPert_BLE::isOff() {
+  return !isOn();
+}
+
+bool ESPert_BLE::on() {
+  if (swSerial) {
+    swSerial->write("AT+IBEA1");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      _espert->println("ESPert: " + ESPertReadString);
+
+      if (ESPertReadString == "OK+Set:1") {
+        delay(100);
+        return true;
+      } else if (ESPertReadString == "OK+Set:0") {
+        delay(100);
+        return false;
+      }
+    }
+  }
+
+  _espert->println("ESPert: Unknown command!");
+  return false;
+}
+
+bool ESPert_BLE::off() {
+  if (swSerial) {
+    swSerial->write("AT+IBEA0");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      _espert->println("ESPert: " + ESPertReadString);
+
+      if (ESPertReadString == "OK+Set:0") {
+        delay(100);
+        return true;
+      } else if (ESPertReadString == "OK+Set:1") {
+        delay(100);
+        return false;
+      }
+    }
+  }
+
+  _espert->println("ESPert: Unknown command!");
+  return false;
+}
+
+String ESPert_BLE::getUUID()
+{
+  String UUID = "";
+
+  if (swSerial) {
+    swSerial->write("AT+IBE0?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      _espert->println("ESPert: " + ESPertReadString.substring(9));
+      UUID += ESPertReadString.substring(9);
+    }
+
+    swSerial->write("AT+IBE1?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      _espert->println("ESPert: " + ESPertReadString.substring(9));
+      UUID += ESPertReadString.substring(9);
+    }
+
+    swSerial->write("AT+IBE2?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      _espert->println("ESPert: " + ESPertReadString.substring(9));
+      UUID += ESPertReadString.substring(9);
+    }
+
+    swSerial->write("AT+IBE3?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      _espert->println("ESPert: " + ESPertReadString.substring(9));
+      UUID += ESPertReadString.substring(9);
+    }
+  }
+
+  return UUID;
+}
+
+int ESPert_BLE::getMajor() {
+  if (swSerial) {
+    swSerial->write("AT+MARJ?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      int l = strtol(ESPertReadString.substring(9).c_str(), NULL, 16);
+      return l;
+    }
+  }
+
+  return -1;
+}
+
+int ESPert_BLE::getMinor() {
+  if (swSerial) {
+    swSerial->write("AT+MINO?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      int l = strtol(ESPertReadString.substring(9).c_str(), NULL, 16);
+      return l;
+    }
+  }
+
+  return -1;
+}
+
+int ESPert_BLE::getTXPower() {
+  if (swSerial) {
+    swSerial->write("AT+MEAS?");
+    delay(100);
+    ESPertReadString = swSerial->readString();
+
+    if (ESPertReadString.length() != 0) {
+      int l = strtol(ESPertReadString.substring(9).c_str(), NULL, 16);
+      return l;
+    }
+  }
+
+  return -1;
+}
+
+// ****************************************
+// Button class
+// ****************************************
+ESPert_Button::ESPert_Button() {
+  currentButtonStatus = false;
+  buttonPressTime = millis();
+  buttonPin = ESPERT_PIN_BUTTON;
+  isLongPressEnabled = true;
+}
+
+void ESPert_Button::init(int pin) {
+  if (pin == -1) {
+    buttonPin = ESPERT_PIN_BUTTON;
+  } else {
+    buttonPin = pin;
+  }
+
+  pinMode(buttonPin, INPUT_PULLUP);
+
+  currentButtonStatus = false;
+  buttonPressTime = millis();
+  isLongPressEnabled = true;
 }
 
 long ESPert_Button::getPressTime() {
-    if( isOn() ) {
-        return millis() - buttonPressTime;
-    }
+  if (isOn()) {
+    return millis() - buttonPressTime;
+  }
 
-    return 0l;
+  return 0l;
 }
 
 void ESPert_Button::resetPressTime() {
-    buttonPressTime = millis();
+  buttonPressTime = millis();
 }
 
 bool ESPert_Button::isLongPress() {
-    return( getPressTime() >= 2000 ) ? true : false;
+  return (isLongPressEnabled && getPressTime() >= 2000) ? true : false;
+}
+
+void ESPert_Button::enableLongPress() {
+  buttonPressTime = millis();
+  isLongPressEnabled = true;
+}
+
+void ESPert_Button::disableLongPress() {
+  buttonPressTime = millis();
+  isLongPressEnabled = false;
 }
 
 bool ESPert_Button::isOn() {
-    bool buttonPressed = false;
+  int status = digitalRead(buttonPin);
+  delay(100);
 
-    buttonPressed = (digitalRead(pin_button) == LOW) ? true : false;
+  bool buttonPressed = (status == LOW) ? true : false;
 
-    if (buttonPressed != currentButtonStatus) {
-        if (buttonPressed) {
-            buttonPressTime = millis();
-            ESPERT_INFO_PRINT("Button: ON");
-        } else {
-            ESPERT_INFO_PRINT("Button: OFF");
-        }
-        currentButtonStatus = buttonPressed;
+  if (buttonPressed != currentButtonStatus) {
+    if (buttonPressed) {
+      buttonPressTime = millis();
     }
 
-    return buttonPressed;
+    currentButtonStatus = buttonPressed;
+  }
+
+  return buttonPressed;
 }
 
 bool ESPert_Button::isOff() {
-    return (digitalRead(pin_button) == HIGH) ? true : false;
+  int status = digitalRead(buttonPin);
+  delay(100);
+  return (status == HIGH) ? true : false;
 }
 
 bool ESPert_Button::get() {
-    return (digitalRead(pin_button) == HIGH) ? true : false;
+  int status = digitalRead(buttonPin);
+  delay(100);
+  return (status == HIGH) ? true : false;
 }
 
-bool ESPert_GroveButton::isOn() {
-    return !ESPert_Button::isOn();
+// ****************************************
+// DHT class
+// ****************************************
+ESPert_DHT::ESPert_DHT() {
+  DHT *dht = NULL;
+  dhtPin = ESPERT_PIN_DHT;
+  dhtType = ESPERT_DHT_TYPE;
 }
 
-bool ESPert_GroveButton::isOff() {
-    return !ESPert_Button::isOff();
+void ESPert_DHT::init(int gpio, int type, int tx) {
+  dhtPin = (gpio == -1) ? ESPERT_PIN_DHT : gpio;
+  dhtType = (type == -1) ? ESPERT_DHT_TYPE : type;
+
+  if (tx == -1) {
+    tx = (dhtType == DHT22) ? 30 : 15;
+  }
+
+  if (!dht) {
+    dht = new DHT(dhtPin, dhtType, tx);
+    dht->begin();
+  }
 }
 
-bool ESPert_GroveButton::get() {
-    return !ESPert_Button::get();
+bool ESPert_DHT::isReady() {
+  return (dht ? true : false);
+}
+
+float ESPert_DHT::getHumidity() {
+  float humidity = NAN;
+  int retry = 8;
+
+  while (dht && retry) {
+    humidity = dht->readHumidity();
+
+    if (isnan(humidity)) {
+      if (--retry == 0) {
+        _espert->println("ESPert: Failed to read humidity from DHT sensor!");
+      }
+    } else {
+      break;
+    }
+  }
+
+  return humidity;
+}
+
+float ESPert_DHT::getTemperature(bool isFarenheit) {
+  float temperature = NAN;
+  int retry = 3;
+
+  while (dht && retry) {
+    temperature = dht->readTemperature(isFarenheit);
+
+    if (isnan(temperature)) {
+      if (--retry == 0) {
+        _espert->println("ESPert: Failed to read temperature from DHT sensor!");
+      }
+    } else {
+      break;
+    }
+  }
+
+  return temperature;
+}
+
+// *************************************************
+// EEPROM class
+// *************************************************
+String ESPert_EEPROM::read(int index, int length) {
+  String text = "";
+  char ch = 1;
+
+  for (int i = index; (i < (index + length)) && ch; ++i) {
+    if (ch = EEPROM.read(i)) {
+      text.concat(ch);
+    }
+  }
+
+  return text;
+}
+
+int ESPert_EEPROM::write(int index, String text) {
+  for (int i = index; i < text.length() + index; ++i) {
+    EEPROM.write(i, text[i - index]);
+  }
+
+  EEPROM.write(index + text.length(), 0);
+  EEPROM.commit();
+
+  return text.length() + 1;
+}
+
+// *************************************************
+// JSON class
+// *************************************************
+ESPert_JSON::ESPert_JSON() {
+  json = NULL;
+  root = NULL;
+}
+
+bool ESPert_JSON::init(String payload) {
+  release();
+
+  bool success = false;
+  unsigned int length = payload.length();
+
+  if (json = (char*)malloc(length)) {
+    memset(json, '\0', length);
+    memcpy(json, payload.c_str(), length);
+    root = &jsonBuffer.parseObject(json);
+
+    if (!(success = root->success())) {
+      release();
+    }
+  }
+
+  return success;
+}
+
+bool ESPert_JSON::containsKey(String key) {
+  return (json && root->containsKey(key.c_str()));
+}
+
+String ESPert_JSON::get(String key) {
+  return (json ? (const char*)(*root)[key.c_str()] : "");
+}
+
+void ESPert_JSON::release() {
+  free(json);
+  json = NULL;
+  root = NULL;
+}
+
+// ****************************************
+// LED class
+// ****************************************
+ESPert_LED::ESPert_LED() {
+  ledPin = ESPERT_PIN_LED;
+}
+
+void ESPert_LED::init(int pin) {
+  if (pin == -1) {
+    ledPin = ESPERT_PIN_LED;
+  } else {
+    ledPin = pin;
+  }
+
+  pinMode(ledPin, OUTPUT);
+  off();
+}
+
+void ESPert_LED::on() {
+  set(true);
+}
+
+void ESPert_LED::off() {
+  set(false);
+}
+
+void ESPert_LED::set(bool state) {
+  if (ESPertBoardType == ESPERT_BOARD_ESP201) {
+    digitalWrite(ledPin, (state ? HIGH : LOW));
+  } else {
+    digitalWrite(ledPin, (state ? LOW : HIGH));
+  }
+}
+
+int ESPert_LED::get() {
+  if (ESPertBoardType == ESPERT_BOARD_ESP201) {
+    return (digitalRead(ledPin) == 1 ? 1 : 0);
+  } else {
+    return (digitalRead(ledPin) == 1 ? 0 : 1);
+  }
+}
+
+bool ESPert_LED::isOn() {
+  return (get() == 1) ? true : false;
+}
+
+bool ESPert_LED::isOff() {
+  return (get() == 0) ? true : false;
 }
 
 // ****************************************
 // OLED class
 // ****************************************
+ESPert_OLED::ESPert_OLED() {
+  display = NULL;
+}
+
 void ESPert_OLED::init() {
-  if (!isReady()) {
+  if (!display) {
     display = new Adafruit_SSD1306(4);
 
 #if (SSD1306_LCDHEIGHT != 64)
@@ -300,11 +686,14 @@ bool ESPert_OLED::isReady() {
   return (display ? true : false);
 }
 
-void ESPert_OLED::clear() {
+void ESPert_OLED::clear(bool clearImmediately) {
   if (display) {
     display->clearDisplay();
-    display->display();
     setCursor(0, 0);
+
+    if (clearImmediately) {
+      display->display();
+    }
   }
 }
 
@@ -332,916 +721,762 @@ void ESPert_OLED::setCursor(int16_t x, int16_t y) {
   }
 }
 
-void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color) {
+int16_t ESPert_OLED::getCursorX() {
+  return display->getCursorX();
+}
+
+int16_t ESPert_OLED::getCursorY() {
+  return display->getCursorY();
+}
+
+void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately) {
   if (display) {
     display->drawBitmap(x, y,  bitmap, w, h, color);
+
+    if (drawImmediately) {
+      display->display();
+    }
   }
 }
 
-void ESPert_OLED::print(const String &s) {
+void ESPert_OLED::print(const String &s, bool printImmediately) {
   if (display) {
     display->print(s);
-    display->display();
+
+    if (printImmediately) {
+      display->display();
+    }
   }
 }
 
-void ESPert_OLED::print(double f, int p) {
+void ESPert_OLED::print(double f, int p, bool printImmediately) {
   if (display) {
     display->print(f, p);
-    display->display();
+
+    if (printImmediately) {
+      display->display();
+    }
   }
 }
 
-void ESPert_OLED::print(int i) {
-    if (display) {
-        display->print(i);
-        display->display();
+void ESPert_OLED::print(int i, bool printImmediately) {
+  if (display) {
+    display->print(i);
+
+    if (printImmediately) {
+      display->display();
     }
+  }
 }
 
-void ESPert_OLED::println(const String &s) {
+void ESPert_OLED::println(const String &s, bool printImmediately) {
   if (display) {
     display->println(s);
-    display->display();
+
+    if (printImmediately) {
+      display->display();
+    }
   }
 }
 
-void ESPert_OLED::println(double f, int p) {
+void ESPert_OLED::println(double f, int p, bool printImmediately) {
   if (display) {
     display->println(f, p);
+
+    if (printImmediately) {
+      display->display();
+    }
+  }
+}
+
+void ESPert_OLED::println(int i, bool printImmediately) {
+  if (display) {
+    display->println(i);
+
+    if (printImmediately) {
+      display->display();
+    }
+  }
+}
+
+void ESPert_OLED::update() {
+  if (display) {
     display->display();
   }
 }
 
-void ESPert_OLED::println(int i) {
-    if (display) {
-        display->println(i);
-        display->display();
-    }
-}
-
 // ****************************************
-// HUTMP class
+// MQTT class
 // ****************************************
-void ESPert_DHT::init( int pin, int type ) {
-    if( pin == -1 )
-        pin_dht = ESPERT_PIN_DHT;
-    else
-        pin_dht = pin;
-        
-    if( type == -1 )
-        dht_type = ESPERT_DHT_TYPE;
-    else
-        dht_type = type;
-        
-    int tx = 15;
-    if( dht_type == DHT22 ) 
-        tx = 30;
-        
-  if (!isReady()) {
-    dht = NULL;
-
-    dht = new DHT(pin_dht, dht_type, tx);
-    dht->begin();
-  }
-}
-
-bool ESPert_DHT::isReady() {
-    return (dht ? true : false);
-}
-
-int ESPert_DHT::getHumidity() {
-    return dht->readHumidity();
-}
-
-int ESPert_DHT::getTemperature() {
-    return dht->readTemperature();
-}
-
-// *******************************************
-// WiFi
-// *******************************************
-int  ESPert_WiFi::init()
+ESPert_MQTT::ESPert_MQTT()
 {
-    boolean bAutoConfig = true;
-    
-    WiFi.mode(WIFI_STA);
+  mqttClient = NULL;
+  mqttCallback = NULL;
+  mqttUser = "";
+  mqttPassword = "";
+}
 
-    String str = _espert->EEPROM_Read( 237, 32 );
+void ESPert_MQTT::init(IPAddress server, int port, String user, String password, PubSubClient::callback_t cb) {
+  mqttUser = user;
+  mqttPassword = password;
+  mqttCallback = cb;
+
+  if (mqttClient) {
+    if (mqttClient->connected())
     {
-        if( str == "TESPA:Disconnect" ) {
-            Serial.println("Disconnected on startup");
-            WiFi.disconnect();
-            delay( 100 );
-            _espert->EEPROM_Write( 237, "TESPA:" );
-            delay( 1000 );
-        }
-        if( str == "TESPA:NoAutoConnect" ) {
-            WiFi.disconnect();
-            delay( 100 );
-            bAutoConfig = false;
-        }
-        if( str == "TESPA:AutoConnect" ) {
-            bAutoConfig = true;
-        }
+      mqttClient->disconnect();
     }
-  
-    if( bAutoConfig ) {
-        if( !test() )
-        {
-            if( !smartConfig() ) {
-                wifiMode = ESPERT_WIFI_MODE_SETTINGAP;
 
-                // LED: ... ... ...                        
-                _espert->LED.on();
-                delay(50);
-                _espert->LED.off();
-                delay(50);
-                _espert->LED.on();
-                delay(50);
-                _espert->LED.off();
-                delay(50);
-                _espert->LED.on();
-                delay(50);
-                _espert->LED.off();
-                                        
-                initSetupAP();
-                _espert->LED.off();
-                Serial.println("AP & Server started");
-                Serial.println(WiFi.softAPIP());
-                if( _espert->OLED.isReady() ) {
-                    _espert->OLED.println( "WiFi: Setting AP" );
-                    _espert->OLED.print( "IP: " );
-                    _espert->OLED.println( getAPIP() );    
-                }
-                while( 1 ) {
-                    if( _espert->button.isLongPress() ) {
-                        setAutoConnect( false );
-                    }
-                    if ( server ) {
-                        server->handleClient();
-                        _espert->LED.on();
-                        delay(50);
-                        _espert->LED.off();
-                        delay(50);
-                        _espert->LED.on();
-                        delay(50);
-                        _espert->LED.off();
-                        delay(50);
-                        _espert->LED.on();
-                        delay(50);
-                        _espert->LED.off();
-                    }                    
-                    delay(1000);
-                }
-                return ESPERT_WIFI_MODE_SETTINGAP;
-            }
-            else {
-                wifiMode = ESPERT_WIFI_MODE_CONNECT;
-                Serial.println("WiFi connected");
-                Serial.println(WiFi.localIP());
+    delete mqttClient;
+    mqttClient = NULL;
+  }
 
-                Serial.println("WiFi smart config connected");
-                Serial.println(WiFi.localIP());
-                WiFi.printDiag(Serial);
-
-                _espert->OLED.clear();
-                _espert->OLED.setCursor( 0, 0 );
-                _espert->OLED.println( _espert->getId() );
-                _espert->OLED.println( "" );           
-
-                return ESPERT_WIFI_MODE_CONNECT;
-            }
-        }
-        else {
-            wifiMode = ESPERT_WIFI_MODE_CONNECT;
-            Serial.println("WiFi auto connected");
-            Serial.println(WiFi.localIP());
-            WiFi.printDiag(Serial);
-            return ESPERT_WIFI_MODE_CONNECT;
-        }
-    }
-    else {
-        wifiMode = ESPERT_WIFI_MODE_DISCONNECT;
-        Serial.println("WiFi not connected");
-        Serial.println(WiFi.localIP());
-        return ESPERT_WIFI_MODE_DISCONNECT;
-    }
+  mqttClient = new PubSubClient(server, port);
 }
 
-bool ESPert_WiFi::smartConfig()
-{
-  _espert->LED.on();
-  wifiMode = ESPERT_WIFI_MODE_SMARTCONFIG;
-  
-  if( _espert->OLED.isReady() ) {
-    _espert->OLED.println("WiFi: Smart Config" );
-  }
-  
-  WiFi.beginSmartConfig();
-  while(1){
-    if( _espert->button.isOn() ) {
-      long pt = _espert->button.getPressTime();
-      if( pt > 2000 ) {
-        WiFi.stopSmartConfig();
-        _espert->LED.off();
-        return false;
-      }
-    }
-    Serial.print("*");
-    if(WiFi.smartConfigDone()){
-      Serial.println( "" );
-      Serial.println("SmartConfig Success");
-      while(WiFi.waitForConnectResult() != WL_CONNECTED){
-        Serial.print( "#" );        
-        delay( 500 );      
-        _espert->LED.off();
-        delay( 50 );
-        _espert->LED.on();
-      }
-      Serial.println( "" );
-      Serial.println( "WiFi Smart connect success." );              
-      break;
-    }
-    delay( 500 );
-    _espert->LED.off();
-    delay( 50 );
-    _espert->LED.on();
-  }
-  _espert->LED.off();
-  return true;
+void ESPert_MQTT::init(IPAddress server, int port, PubSubClient::callback_t cb) {
+  init(server, port, "", "", cb);
 }
 
-void ESPert_WiFi::initSetupAP(void)
-{
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
-  numberOfNetworks = WiFi.scanNetworks();
-  Serial.println("scan done");
-  if (numberOfNetworks == 0)
-    Serial.println("no networks found");
-  else
-  {
-    if (numberOfNetworks > MAX_NETWORKS)
+void ESPert_MQTT::init(String server, int port, String user, String password, PubSubClient::callback_t cb) {
+  mqttUser = user;
+  mqttPassword = password;
+  mqttCallback = cb;
+
+  if (mqttClient) {
+    if (mqttClient->connected())
     {
-      numberOfNetworks = MAX_NETWORKS;
+      mqttClient->disconnect();
     }
-    Serial.print(numberOfNetworks);
-    Serial.println(" networks found");
-    for (int i = 0; i < numberOfNetworks; ++i)
-     {
-      networks[i] = String(WiFi.SSID(i));
 
-      // Print SSID and RSSI for each network found
-      Serial.print(i + 1);
-      Serial.print(": ");
-      Serial.print(WiFi.SSID(i));
-      Serial.print(" (");
-      Serial.print(WiFi.RSSI(i));
-      Serial.print(")");
-      Serial.println((WiFi.encryptionType(i) == ENC_TYPE_NONE) ? " " : "*");
-      delay(10);
-     }
+    delete mqttClient;
+    mqttClient = NULL;
   }
-  Serial.println("");
 
-  delay(100);
-  WiFi.softAP(_espert->getId().c_str());
-  Serial.println("softap");
-
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.print("Local IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("SoftAP IP: ");
-  Serial.println(WiFi.softAPIP());
-
-  if (!mdns.begin("tespa.setup", WiFi.softAPIP())) {
-    Serial.println("Error setting up MDNS responder!");
-  }
-  else {
-    Serial.println("mDNS responder started");
-  }
-  initSetupServer();
-  Serial.println("over");
+  mqttClient = new PubSubClient(server, port);
 }
 
-
-bool ESPert_WiFi::test(void) {
-  int c = 0;
-  Serial.println("Waiting for Wifi to connect");
-  while ( c < 15 ) {
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println( "" );
-      Serial.println("Connected.");
-      return true;
-    }
-    delay(1000);
-    int n = WiFi.status();
-    if( n == 0 )
-    {
-        Serial.println("No ESP auto connect info");
-        _espert->LED.off();
-        return false;
-    } 
-    Serial.print(n);
-    _espert->LED.on();
-    delay( 50 );
-    _espert->LED.off();
-    c++;
-  }
-  Serial.println("");
-  Serial.println("Connect timed out.");
-  return false;
-}
-
-void ESPert_WiFi::initSetupServer()
-{
-        IPAddress ip = WiFi.softAPIP();
-        String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
-  String title = String("Hello from TESPA at ") + ipStr;
-
-  contentHeader = "";
-  contentHeader += String("<html>\r\n");
-  contentHeader += String("  <head>\r\n");
-  contentHeader += String("    <title>") + title + " </title>\r\n";
-  contentHeader += String("    <meta http-equiv='Content-Type' content='text/html; charset=utf-8'>\r\n");
-  contentHeader += String("    <meta name='viewport' content='width=device-width, initial-scale=1'>\r\n");
-  contentHeader += String("  </head>\r\n");
-  contentHeader += String("  <body>\r\n");
-  contentHeader += String("    <div align=center>\r\n");
-  contentHeader += String("      <form id='settings' name='settings' action='setting' method='POST'>\r\n");
-  contentHeader += String("        <table cellspacing=0 cellpadding=2 style='border:thin solid black'>\r\n");
-  contentHeader += String("          <tr style='background-color:#666666; min-width:298px; max-width:298px'><td style='min-width:298px; max-width:298px' align=center colspan=2><font color=#ffffff>") + title + "</font></td></tr>\r\n";
-
-  contentFooter = "";
-  contentFooter += String("        </table>\r\n");
-  contentFooter += String("      </form>\r\n");
-  contentFooter += String("    </div>\r\n");
-  contentFooter += String("  </body>\r\n");
-  contentFooter += String("</html>\r\n");
-
-  ssidHeader = "";
-  ssidHeader += String("          <tr style='background-color:#aaaaaa'>\r\n");
-  ssidHeader += String("            <td align=right>SSID:</td>\r\n");
-  ssidHeader += String("            <td>\r\n");
-  ssidHeader += String("              <select id=ssid name=ssid>\r\n");
-  ssidHeader += String("                <option value="">Choose a Network</option>\r\n");
-
-  ssidFooter = "";
-  ssidFooter += String("              </select>\r\n");
-  ssidFooter += String("            </td>\r\n");
-  ssidFooter += String("          </tr>\r\n");
-
-  server = new ESP8266WebServer(80);
-
-  server->on("/", []() {
-    content = contentHeader + ssidHeader;
-
-    for (int i = 0; i < numberOfNetworks; ++i) {
-      content += String("                <option value='") + networks[i] + "'" + ((networks[i] == ssid) ? " selected>" : ">") + networks[i] + "</option>\r\n";
-    }
-
-    content += String("          <tr style='background-color:#cccccc'><td align=right>Password:</td><td><input type=text id=pass name=pass value='") + pass + "'></td></tr>\r\n";
-    content += ssidFooter;
-    content += String("          <tr><td colspan=2 align=center><input type=submit id=submitButton name=submitButton value='Submit'></td></tr>\r\n");
-    content += contentFooter;
-
-    server->send(200, "text/html", content);
-  });
-
-  server->on("/setting", []() {
-    ssid = server->arg("ssid");
-    pass = server->arg("pass");
-    ssid.replace( "+", " " );
-    ssid.replace( "%40", "@" );
-    if (ssid.length() > 0) {
-        /*
-        Serial.println("clearing eeprom");
-        for (int i = 0; i < 96; ++i) {
-            EEPROM.write(i, 0);
-        }
-        Serial.println(ssid);
-        Serial.println("");
-        Serial.println(pass);
-        Serial.println("");
-
-        Serial.println("writing eeprom ssid:");
-        for (int i = 0; i < ssid.length(); ++i)
-        {
-            EEPROM.write(i, ssid[i]);
-            Serial.print("Wrote: ");
-            Serial.println(ssid[i]);
-        }
-        Serial.println("writing eeprom pass:");
-        for (int i = 0; i < pass.length(); ++i)
-        {
-            EEPROM.write(32 + i, pass[i]);
-            Serial.print("Wrote: ");
-            Serial.println(pass[i]);
-        }
-        EEPROM.commit();
-        */
-
-        content = contentHeader + ssidHeader;
-        for (int i = 0; i < numberOfNetworks; ++i) {
-            content += String("                <option value='") + networks[i] + "'" + ((networks[i] == ssid) ? " selected>" : ">") + networks[i] + "</option>\r\n";
-        }
-        content += String("          <tr style='background-color:#cccccc'><td align=right>Password:</td><td><input type=text id=pass name=pass value='") + pass + "'></td></tr>\r\n";
-        content += ssidFooter;
-        content += String("          <tr><td colspan=2 align=center>Saved to EEPROM...<br>Reset to boot into new Wi-Fi.</td></tr>\r\n");
-        content += contentFooter;
-
-        server->send(200, "text/html", content);
-        delay( 1000 );
-        
-        WiFi.begin(ssid.c_str(), pass.c_str());
-        int c = 0;
-        Serial.println("Waiting for Wifi to connect");
-        while ( c < 15 ) {
-            if (WiFi.status() == WL_CONNECTED) {
-                Serial.println( "" );
-                Serial.println("Connected.");
-                Serial.println("");
-                Serial.println("WiFi connected");
-                Serial.print("Local IP: ");
-                Serial.println(WiFi.localIP());
-                Serial.print("SoftAP IP: ");
-                break;
-            }
-            delay(1000);
-            int n = WiFi.status();
-            if( n == 0 )
-            {
-                Serial.println("No auto connect available");
-                if( _boardType == ESPERT_BOARD_ESP201 ) {
-                    digitalWrite( ESPERT_PIN_LED, LOW );
-                }
-                else {
-                    digitalWrite( ESPERT_PIN_LED, HIGH );
-                }
-                break;
-            } 
-            Serial.print(n);
-                if( _boardType == ESPERT_BOARD_ESP201 ) {
-                    digitalWrite( ESPERT_PIN_LED, HIGH );
-                }
-                else {
-                    digitalWrite( ESPERT_PIN_LED, LOW );
-                }
-            delay( 50 );
-            if( _boardType == ESPERT_BOARD_ESP201 ) {
-                digitalWrite( ESPERT_PIN_LED, LOW );
-            }
-            else {
-                digitalWrite( ESPERT_PIN_LED, HIGH );
-            }
-            c++;
-        }        
-        
-        ESP.reset();
-    } else {
-        content = "Error";
-        Serial.println("Sending 404");
-        server->send(200, "text/html", content);
-    }
-  });
-
-  server->begin();
-  Serial.println("HTTP server started");
-}
-
-void ESPert_WiFi::disconnect( bool reset )
-{
-    Serial.println("WiFi disconnected.");
-    if( _boardType == ESPERT_BOARD_ESP201 ) {    
-        _espert->EEPROM_Write( 237, "TESPA:Disconnect");
-        Serial.println("WiFi disconnect on restart");
-    }
-    else {
-        WiFi.disconnect();
-        delay(100);
-    }
-    if( reset )
-    {
-        ESP.reset();
-    }
-}
-
-void ESPert_WiFi::setAutoConnect( bool bAuto )
-{
-    Serial.print("WiFi set auto connect: ");
-    Serial.println(bAuto);
-
-    if( bAuto ) {
-        _espert->EEPROM_Write( 237, "TESPA:AutoConnect");
-        Serial.println("WiFi auto connect on restart");
-    } 
-    else {
-        _espert->EEPROM_Write( 237, "TESPA:NoAutoConnect");
-        Serial.println("WiFi NO auto connect on restart");
-    }   
-    delay(100);
-    ESP.reset();
-}
-
-
-String ESPert_WiFi::getLocalIP()
-{
-    IPAddress ip =  WiFi.localIP();
-    char textID[ 32 ];
-    sprintf( textID, "%i.%i.%i.%i", ip[0], ip[1], ip[2], ip[3]);
-    return String( textID );
-}
-
-String ESPert_WiFi::getAPIP()
-{
-    IPAddress ip =  WiFi.softAPIP();
-    char textID[ 32 ];
-    sprintf( textID, "%i.%i.%i.%i", ip[0], ip[1], ip[2], ip[3]);
-    return String( textID );
-}
-
-
-// *************************************************
-// EEPROM 
-// *************************************************
-String ESPert::EEPROM_Read( int index, int length ) 
-{
-  EEPROM.begin(512);
-  delay(10);
-  Serial.println("Reading EEPROM");
-  String text = "";
-  char ch = 1;
-  for (int i = index; (i < (index+length)) && ch; ++i)
-  {
-    if (ch = EEPROM.read(i))
-    {
-        text.concat(ch);
-        //Serial.print("Read: ");
-        //Serial.println(ch);
-    }
-  }
-  Serial.print("TEXT: ");
-  Serial.println(String(text.c_str()));
-  Serial.println("Reading EEPROM pass");
-  return text;
-}
-
-int ESPert::EEPROM_Write( int index, String text ) 
-{
-  EEPROM.begin(512);
-  delay(10);
-  Serial.println("Writing EEPROM");
-  Serial.println(text);
-  for (int i = index; i<text.length()+index; ++i)
-  {
-    EEPROM.write( i, text[i-index] );
-    //Serial.print("Wrote: ");
-    //Serial.println(text[i-index]);
-  }
-  EEPROM.write( index+text.length(), 0 );
-  EEPROM.commit();
-
-  Serial.println("Writing EEPROM pass");
-  return text.length()+1;
-}
-
-void ESPert_GroveRelay::on() {
-    ESPert_LED::set(false);
-}
-
-void ESPert_GroveRelay::off() {
-    ESPert_LED::set(true);
-}
-
-void ESPert_GroveRelay::set(bool state) {
-    ESPert_LED::set( !state );
-}
-
-int ESPert_GroveRelay::get() {
-    return !ESPert_LED::get();
-}
-
-
-void ESPert_MQTT::init( IPAddress server, int port )
-{
-    callback = NULL;
-    IPAddress mqtt_server = server;
-    mqtt_client = new PubSubClient(mqtt_server, port);
-}
-
-void ESPert_MQTT::init( String server, int port )
-{
-    callback = NULL;
-    String mqtt_server = server;
-    mqtt_client = new PubSubClient(mqtt_server, port);
-}
-
-PubSubClient *ESPert_MQTT::getPubSubClient()
-{
-    return mqtt_client;
-}
-
-String ESPert_MQTT::getClientName()
-{
-    String clientName;
-    uint8_t mac[6];
-
-    clientName += "ESPert-";
-    WiFi.macAddress(mac);
-    clientName += macToStr(mac);
-    clientName += "-";
-    clientName += String(micros() & 0xff, 16);  
-    return clientName;
-}
-
-void ESPert_MQTT::publish( String topic, String value )
-{
-    // Publish temperature
-    if( mqtt_client ) {
-        mqtt_client->publish(topic, (char *) value.c_str());
-    }
-}
-
-void ESPert_MQTT::subscribe( String topic )
-{
-    if( mqtt_client ) {
-        _espert->println( "Subscribe: " + topic );
-        mqtt_client->subscribe(topic);
-    }
+void ESPert_MQTT::init(String server, int port, PubSubClient::callback_t cb) {
+  init(server, port, "", "", cb);
 }
 
 void ESPert_MQTT::setCallback(PubSubClient::callback_t cb) {
-    callback = cb;
+  mqttCallback = cb;
 }
 
-/* MQTT server connection */
-void ESPert_MQTT::connect() {
-  // add reconnection logics
-  if (!mqtt_client->connected()) {
-    mqtt_client->set_callback(callback);
+PubSubClient *ESPert_MQTT::getPubSubClient() {
+  return mqttClient;
+}
 
-    // connection to MQTT server
-    String cn = getClientName();
-    if (mqtt_client->connect((char *)cn.c_str())) 
-    {
-      Serial.println("[PHYSICAL] Successfully connected with MQTT");
-      //Serial.print( "Server: " );
-      //Serial.println( mqtt_client->server_hostname );
-      Serial.print( "Client ID: " );
-      Serial.println( cn );
+String ESPert_MQTT::getClientName() {
+  String clientName = "";
+  uint8_t mac[6] = {0};
+
+  clientName += "ESPert-";
+  WiFi.macAddress(mac);
+  clientName += _espert->macToString(mac);
+  clientName += "-";
+  clientName += String(micros() & 0xff, 16);
+  return clientName;
+}
+
+void ESPert_MQTT::publish(String topic, String value) {
+  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
+    mqttClient->publish(topic, (char *) value.c_str());
+  }
+}
+
+void ESPert_MQTT::subscribe(String topic) {
+  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
+    mqttClient->subscribe(topic);
+  }
+}
+
+bool ESPert_MQTT::connect() {
+  bool reconnected = false;
+
+  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
+    if (!mqttClient->connected()) {
+      String cn = getClientName();
+
+      if (mqttUser.length() > 0) {
+        reconnected = mqttClient->connect(MQTT::Connect((char *)cn.c_str()).set_auth(mqttUser, mqttPassword));
+      } else {
+        reconnected = mqttClient->connect((char *)cn.c_str());
+      }
+
+      if (reconnected) {
+        if (mqttCallback) {
+          mqttClient->set_callback(mqttCallback);
+        }
+      }
+    }
+
+    mqttClient->loop();
+  }
+
+  return reconnected;
+}
+
+// *******************************************
+// WiFi class
+// *******************************************
+ESPert_WiFi::ESPert_WiFi() {
+  wifiMode = ESPERT_WIFI_MODE_DISCONNECT;
+}
+
+int ESPert_WiFi::init() {
+  WiFi.mode(WIFI_STA);
+
+  boolean bAutoConfig = true;
+  String str = _espert->eeprom.read(237, 32);
+
+  if (str == "ESPert:Disconnect") {
+    _espert->println("ESPert: Disconnected on startup!");
+    WiFi.disconnect();
+    delay(100);
+    _espert->eeprom.write(237, "ESPert:");
+    delay(1000);
+  } else if (str == "ESPert:NoAutoConnect") {
+    WiFi.disconnect();
+    delay(100);
+    bAutoConfig = false;
+  } else if (str == "ESPert:AutoConnect") {
+    bAutoConfig = true;
+  }
+
+  if (bAutoConfig) {
+    if (!test()) {
+      if (!smartConfig()) {
+        wifiMode = ESPERT_WIFI_MODE_SETTINGAP;
+
+        _espert->led.on();
+        delay(50);
+        _espert->led.off();
+        delay(50);
+        _espert->led.on();
+        delay(50);
+        _espert->led.off();
+        delay(50);
+        _espert->led.on();
+        delay(50);
+        _espert->led.off();
+
+        initSetupAP();
+        _espert->led.off();
+
+        _espert->println("ESPert: AP & Server started, softAP IP " + _espert->wifi.getAPIP());
+
+        _espert->oled.print("IP..: ");
+        _espert->oled.println(getAPIP());
+        _espert->oled.print("WiFi: Setting AP");
+
+        int progress = 0;
+        int16_t x = _espert->oled.getCursorX();
+        int16_t y = _espert->oled.getCursorY();
+
+        while (1) {
+          drawProgress(x, y, &progress);
+
+          if (_espert->button.isLongPress()) {
+            _espert->button.resetPressTime();
+            setAutoConnect(false);
+          }
+
+          if (ESPertServer) {
+            ESPertServer->handleClient();
+            _espert->led.on();
+            delay(50);
+            _espert->led.off();
+            delay(50);
+            _espert->led.on();
+            delay(50);
+            _espert->led.off();
+            delay(50);
+            _espert->led.on();
+            delay(50);
+            _espert->led.off();
+          }
+
+          delay(1000);
+          ESP.wdtFeed();
+        }
+
+        _espert->button.resetPressTime();
+      } else {
+        wifiMode = ESPERT_WIFI_MODE_CONNECT;
+
+        _espert->println("ESPert: WiFi smart config connected, local IP " + _espert->wifi.getLocalIP());
+        WiFi.printDiag(Serial);
+
+        _espert->button.resetPressTime();
+      }
+    } else {
+      wifiMode = ESPERT_WIFI_MODE_CONNECT;
+
+      _espert->println("ESPert: WiFi auto connected, local IP " + _espert->wifi.getLocalIP());
+      WiFi.printDiag(Serial);
+
+      _espert->button.resetPressTime();
+    }
+  } else {
+    wifiMode = ESPERT_WIFI_MODE_DISCONNECT;
+    _espert->println("ESPert: WiFi not connected, local IP " + _espert->wifi.getLocalIP());
+    _espert->button.resetPressTime();
+  }
+
+  return wifiMode;
+}
+
+int ESPert_WiFi::getMode() {
+  return wifiMode;
+}
+
+bool ESPert_WiFi::smartConfig() {
+  _espert->led.on();
+  wifiMode = ESPERT_WIFI_MODE_SMARTCONFIG;
+  _espert->oled.print("WiFi: Smart Config");
+
+  WiFi.beginSmartConfig();
+
+  int progress = 0;
+  int16_t x = _espert->oled.getCursorX();
+  int16_t y = _espert->oled.getCursorY();
+
+  while (1) {
+    if (_espert->button.isOn()) {
+      if (_espert->button.isLongPress()) {
+        _espert->button.resetPressTime();
+        drawProgress(x, y, NULL);
+        _espert->oled.setCursor(x, y);
+        _espert->oled.println();
+        WiFi.stopSmartConfig();
+        _espert->led.off();
+        return false;
+      }
+    }
+
+    _espert->print("*");
+    drawProgress(x, y, &progress);
+
+    if (WiFi.smartConfigDone()) {
+      _espert->println();
+      _espert->println("ESPert: Smart config success!");
+
+      drawProgress(x, y, NULL);
+      _espert->oled.println();
+      _espert->oled.print("WiFi: Connecting");
+
+      x = _espert->oled.getCursorX();
+      y = _espert->oled.getCursorY();
+
+      progress = 0;
+      int timeOut = 10;
+      ESP.wdtFeed();
+
+      while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+        ESP.wdtFeed();
+
+        if (--timeOut <= 0) {
+          timeOut = 0;
+          break;
+        }
+
+        _espert->print("#");
+        drawProgress(x, y, &progress);
+
+        delay(500);
+        _espert->led.off();
+        delay(50);
+        _espert->led.on();
+      }
+
+      _espert->println();
+      drawProgress(x, y, NULL);
+
+      if (timeOut == 0) {
+        _espert->println("ESPert: WiFi smart connect failed!");
+
+        _espert->oled.setCursor(x, y);
+        _espert->oled.println();
+        _espert->oled.println("WiFi: Failed!");
+
+        _espert->led.off();
+        ESP.wdtFeed();
+        return false;
+      } else {
+        _espert->println("ESPert: WiFi smart connect success!");
+
+        _espert->oled.setCursor(x, y);
+        _espert->oled.println();
+        _espert->oled.println("WiFi: Success!");
+      }
+
+      ESP.wdtFeed();
+      break;
+    }
+
+    delay(500);
+    _espert->led.off();
+    delay(50);
+    _espert->led.on();
+    ESP.wdtFeed();
+  }
+
+  _espert->led.off();
+  return true;
+}
+
+void ESPert_WiFi::initSetupAP(void) {
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  ESPertNumberOfNetworks = WiFi.scanNetworks();
+
+  if (ESPertNumberOfNetworks == 0) {
+    _espert->println("ESPert: No networks found!");
+  } else {
+    int maxNetworks = (sizeof(ESPertNetworks) / sizeof(*ESPertNetworks));
+
+    if (ESPertNumberOfNetworks > maxNetworks) {
+      ESPertNumberOfNetworks = maxNetworks;
+    }
+
+    _espert->println("ESPert: " + String(ESPertNumberOfNetworks) + " networks found.");
+
+    for (int i = 0; i < ESPertNumberOfNetworks; ++i) {
+      ESPertNetworks[i] = String(WiFi.SSID(i));
+
+      _espert->print(i + 1);
+      _espert->print(": ");
+      _espert->print(WiFi.SSID(i));
+      _espert->print(" (");
+      _espert->print(WiFi.RSSI(i));
+      _espert->print(")");
+      _espert->println((WiFi.encryptionType(i) == ENC_TYPE_NONE) ? " " : "*");
+
+      ESP.wdtFeed();
     }
   }
-  mqtt_client->loop();
-}
 
-ESPert_SoftwareSerial::ESPert_SoftwareSerial()
-{
-    swSerial = NULL;
-}
+  delay(100);
+  WiFi.softAP(_espert->getId().c_str());
 
-void ESPert_SoftwareSerial::init( int rx, int tx, int buffer )
-{
-    swSerial = new SoftwareSerial( rx, tx, buffer );
-    
+  _espert->println();
+  _espert->println("ESPert: WiFi connected, softAP IP " + _espert->wifi.getAPIP());
 
-}
-
-String ESPert_SoftwareSerial::readString()
-{
-  _readString = "";
-  while (swSerial && swSerial->available()) {
-    char c = swSerial->read();  //gets one byte from serial buffer
-    _readString += c; //makes the string _readString
-    delay(5);  //slow looping to allow buffer to fill with next character
+  if (!ESPertMDNS.begin("ESPert.setup", WiFi.softAPIP())) {
+    _espert->println("ESPert: Error setting up MDNS responder!");
+  } else {
+    _espert->println("ESPert: MDNS responder started!");
   }
-  if( _readString.length() > 0 )
-    return _readString;
-  return String("");
-}
-/*
 
-void ESPert_SoftwareSerial::write( String str ) {
-  for( int i=0; i<str.length(); i++ ) {
-    swSerial->write(str[i]);
-  }
-}
-*/
-size_t ESPert_SoftwareSerial::write(uint8_t b) {
-    swSerial->write( b );
+  initSetupServer();
 }
 
-int ESPert_SoftwareSerial::read()
-{
-    return swSerial->read();
-}
+bool ESPert_WiFi::test(int timeOut) {
+  int c = 0;
+  _espert->println("ESPert: Waiting for WiFi to connect!");
 
-int ESPert_SoftwareSerial::available()
-{
-    return swSerial->available();
-}
-
-void ESPert_SoftwareSerial::flush()
-{
-    swSerial->flush();
-}
-
-int ESPert_SoftwareSerial::peek()
-{
-    swSerial->peek();
-}
-
-void ESPert_SoftwareSerial::begin( int baud )
-{
-    swSerial->begin( baud);
-    
-    for (char ch = ' '; ch <= 'z'; ch++) {
-        swSerial->write(ch);
-    }
-    swSerial->println("");
-
-    _readString = "";
-}
-
-
-
-bool ESPert_BLE::init( ESPert_SoftwareSerial *swSer )
-{
-  swSerial = swSer;
-    
-  swSerial->write( "AT" );
-  delay( 100 );
-
-  _readString = swSerial->readString();
-  _espert->println( _readString );
-  _espert->println( "***" );
-  if( _readString == "OK" )
-  {
-    delay( 100 );
-    return true;
-  }
-  return false;
-}
-
-String ESPert_BLE::getFirmwareVersion()
-{
-  swSerial->write( "AT+VERR?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    return _readString.substring(7);
-  }
-  return "(unknown)";
-}
-
-bool ESPert_BLE::isOn()
-{
-  swSerial->write( "AT+IBEA?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    _espert->println( _readString );
-    if( _readString == "OK+Get:1" ) {
-      delay( 100 );
+  while (timeOut == -1 || (timeOut != -1 && c < timeOut)) {
+    if (WiFi.status() == WL_CONNECTED) {
+      _espert->println();
+      _espert->println("ESPert: Connected!");
       return true;
     }
-    else if( _readString == "OK+Get:0" ){
-      delay( 100 );
+
+    delay(1000);
+    int n = WiFi.status();
+
+    if (n == 0) {
+      _espert->println("ESPert: No ESP auto connect info!");
+      _espert->led.off();
       return false;
     }
-  }
-  _espert->println( "Unknown command\n" );  
-  return false;
 
-}
+    _espert->print(n);
+    _espert->led.on();
+    delay(50);
+    _espert->led.off();
 
-bool ESPert_BLE::on()
-{
-  swSerial->write( "AT+IBEA1" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    _espert->println( _readString );
-    if( _readString == "OK+Set:1" ) {
-      delay( 100 );
-      return true;
+    if (timeOut != -1) {
+      c++;
     }
-    else if( _readString == "OK+Set:0" ){
-      delay( 100 );
+
+    if (_espert->button.isLongPress()) {
+      _espert->button.resetPressTime();
       return false;
     }
-  }
-  _espert->println( "Unknown command\n" );  
-  return false;
-}
 
-bool ESPert_BLE::off()
-{
-  swSerial->write( "AT+IBEA0" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    _espert->println( _readString );
-    if( _readString == "OK+Set:0" ) {
-      delay( 100 );
-      return true;
-    }
-    else if( _readString == "OK+Set:1" ){
-      delay( 100 );
-      return false;
-    }
+    ESP.wdtFeed();
   }
-  _espert->println( "Unknown command\n" );  
+
+  _espert->println();
+  _espert->println("ESPert: Connect timed out!");
+
   return false;
 }
 
+void ESPert_WiFi::initSetupServer() {
+  IPAddress ip = WiFi.softAPIP();
+  String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
+  String title = String("Hello from ESPert at ") + ipStr;
 
-String ESPert_BLE::getUUID()
-{
-  String UUID = "";
-  swSerial->write( "AT+IBE0?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    _espert->println( _readString.substring( 7 ) );
-    UUID += _readString.substring( 9 );
-  }
-  swSerial->write( "AT+IBE1?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    _espert->println( _readString.substring( 7 ) );
-    UUID += _readString.substring( 9 );
-  }
-  swSerial->write( "AT+IBE2?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    _espert->println( _readString.substring( 7 ) );
-    UUID += _readString.substring( 9 );
-  }
-  swSerial->write( "AT+IBE3?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    _espert->println( _readString.substring( 7 ) );
-    UUID += _readString.substring( 9 );
-  }
+  ESPertContentHeader = "";
+  ESPertContentHeader += String("<html>\r\n");
+  ESPertContentHeader += String("  <head>\r\n");
+  ESPertContentHeader += String("    <title>") + title + " </title>\r\n";
+  ESPertContentHeader += String("    <meta http-equiv='Content-Type' content='text/html; charset=utf-8'>\r\n");
+  ESPertContentHeader += String("    <meta name='viewport' content='width=device-width, initial-scale=1'>\r\n");
+  ESPertContentHeader += String("  </head>\r\n");
+  ESPertContentHeader += String("  <body>\r\n");
+  ESPertContentHeader += String("    <div align=center>\r\n");
+  ESPertContentHeader += String("      <form id='settings' name='settings' action='setting' method='POST'>\r\n");
+  ESPertContentHeader += String("        <table cellspacing=0 cellpadding=2 style='border:thin solid black'>\r\n");
+  ESPertContentHeader += String("          <tr style='background-color:#666666; min-width:298px; max-width:298px'><td style='min-width:298px; max-width:298px' align=center colspan=2><font color=#ffffff>") + title + "</font></td></tr>\r\n";
+  ESP.wdtFeed();
 
-  
-  return UUID;
+  ESPertContentFooter = "";
+  ESPertContentFooter += String("        </table>\r\n");
+  ESPertContentFooter += String("      </form>\r\n");
+  ESPertContentFooter += String("    </div>\r\n");
+  ESPertContentFooter += String("  </body>\r\n");
+  ESPertContentFooter += String("</html>\r\n");
+  ESP.wdtFeed();
+
+  ESPertSSIDHeader = "";
+  ESPertSSIDHeader += String("          <tr style='background-color:#aaaaaa'>\r\n");
+  ESPertSSIDHeader += String("            <td align=right>SSID:</td>\r\n");
+  ESPertSSIDHeader += String("            <td>\r\n");
+  ESPertSSIDHeader += String("              <select id=ssid name=ssid>\r\n");
+  ESPertSSIDHeader += String("                <option value="">Choose a Network</option>\r\n");
+  ESP.wdtFeed();
+
+  ESPertSSIDFooter = "";
+  ESPertSSIDFooter += String("              </select>\r\n");
+  ESPertSSIDFooter += String("            </td>\r\n");
+  ESPertSSIDFooter += String("          </tr>\r\n");
+  ESP.wdtFeed();
+
+  ESPertServer = new ESP8266WebServer(80);
+
+  ESPertServer->on("/", []() {
+    ESPertContent = ESPertContentHeader + ESPertSSIDHeader;
+
+    for (int i = 0; i < ESPertNumberOfNetworks; ++i) {
+      ESPertContent += String("                <option value='") + ESPertNetworks[i] + "'" + ((ESPertNetworks[i] == ESPertSSID) ? " selected>" : ">") + ESPertNetworks[i] + "</option>\r\n";
+      ESP.wdtFeed();
+    }
+
+    ESPertContent += ESPertSSIDFooter;
+    ESPertContent += String("          <tr style='background-color:#cccccc'><td align=right>Password:</td><td><input type=text id=pass name=pass value='") + ESPertPassword + "'></td></tr>\r\n";
+    ESPertContent += String("          <tr><td colspan=2 align=center><input type=submit id=submitButton name=submitButton value='Submit'></td></tr>\r\n");
+    ESPertContent += ESPertContentFooter;
+    ESP.wdtFeed();
+
+    ESPertServer->send(200, "text/html", ESPertContent);
+  });
+
+  ESPertServer->on("/setting", []() {
+    ESPertSSID = ESPertServer->arg("ssid");
+    ESPertPassword = ESPertServer->arg("pass");
+    ESPertSSID.replace("+", " ");
+    ESPertSSID.replace("%40", "@");
+
+    if (ESPertSSID.length() > 0) {
+      ESPertContent = ESPertContentHeader + ESPertSSIDHeader;
+
+      for (int i = 0; i < ESPertNumberOfNetworks; ++i) {
+        ESPertContent += String("                <option value='") + ESPertNetworks[i] + "'" + ((ESPertNetworks[i] == ESPertSSID) ? " selected>" : ">") + ESPertNetworks[i] + "</option>\r\n";
+        ESP.wdtFeed();
+      }
+
+      ESPertContent += ESPertSSIDFooter;
+      ESPertContent += String("          <tr style='background-color:#cccccc'><td align=right>Password:</td><td><input type=text id=pass name=pass value='") + ESPertPassword + "'></td></tr>\r\n";
+      ESPertContent += String("          <tr><td colspan=2 align=center>Saved to EEPROM...<br>Reset to boot into new Wi-Fi.</td></tr>\r\n");
+      ESPertContent += ESPertContentFooter;
+      ESP.wdtFeed();
+
+      ESPertServer->send(200, "text/html", ESPertContent);
+      delay(1000);
+
+      WiFi.begin(ESPertSSID.c_str(), ESPertPassword.c_str());
+      int c = 0;
+      _espert->println("ESPert: Waiting for WiFi to connect!");
+
+      while (c < 15) {
+        if (WiFi.status() == WL_CONNECTED) {
+          _espert->println();
+          _espert->println("ESPert: WiFi connected, local IP " + _espert->wifi.getLocalIP());
+          break;
+        }
+
+        delay(1000);
+        int n = WiFi.status();
+
+        if (n == 0) {
+          _espert->println("ESPert: No auto connect available!");
+
+          if (ESPertBoardType == ESPERT_BOARD_ESP201) {
+            digitalWrite(ESPERT_PIN_LED, LOW);
+          } else {
+            digitalWrite(ESPERT_PIN_LED, HIGH);
+          }
+
+          break;
+        }
+
+        _espert->print(n);
+
+        if (ESPertBoardType == ESPERT_BOARD_ESP201) {
+          digitalWrite(ESPERT_PIN_LED, HIGH);
+        } else {
+          digitalWrite(ESPERT_PIN_LED, LOW);
+        }
+
+        delay(50);
+
+        if (ESPertBoardType == ESPERT_BOARD_ESP201) {
+          digitalWrite(ESPERT_PIN_LED, LOW);
+        } else {
+          digitalWrite(ESPERT_PIN_LED, HIGH);
+        }
+
+        c++;
+        ESP.wdtFeed();
+      }
+
+      ESP.reset();
+    } else {
+      ESPertContent = "Error";
+      _espert->println("ESPert: Sending 404!");
+      ESPertServer->send(200, "text/html", ESPertContent);
+    }
+  });
+
+  ESPertServer->begin();
+  _espert->println("ESPert: HTTP server started!");
 }
 
+void ESPert_WiFi::disconnect(bool reset) {
+  _espert->println("ESPert: WiFi disconnected!");
 
-int ESPert_BLE::getMajor()
-{
-  swSerial->write( "AT+MARJ?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    //_espert->println( _readString );
-    int l = strtol( _readString.substring(9).c_str(), NULL, 16 );
-    return l;
+  if (ESPertBoardType == ESPERT_BOARD_ESP201) {
+    _espert->eeprom.write(237, "ESPert:Disconnect");
+    _espert->println("ESPert: WiFi disconnect on restart!");
+  } else {
+    WiFi.disconnect();
+    delay(100);
   }
-  return -1;
+
+  if (reset) {
+    ESP.reset();
+  }
 }
 
-int ESPert_BLE::getMinor()
-{
-  swSerial->write( "AT+MINO?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    //_espert->println( _readString );
-    int l = strtol( _readString.substring(9).c_str(), NULL, 16 );
-    return l;
+void ESPert_WiFi::setAutoConnect(bool bAuto) {
+  _espert->print("ESPert: WiFi set auto connect: ");
+  _espert->println(bAuto);
+
+  if (bAuto) {
+    _espert->eeprom.write(237, "ESPert:AutoConnect");
+    _espert->println("ESPert: WiFi auto connect on restart!");
+  } else {
+    _espert->eeprom.write(237, "ESPert:NoAutoConnect");
+    _espert->println("ESPert: WiFi no auto connect on restart!");
   }
-  return -1;
+
+  delay(100);
+  ESP.reset();
 }
 
-int ESPert_BLE::getTXPower()
-{
-  swSerial->write( "AT+MEAS?" );
-  delay( 100 );
-  _readString = swSerial->readString();
-  if( _readString.length() != 0 )
-  {
-    //_espert->println( _readString );
-    int l = strtol( _readString.substring(9).c_str(), NULL, 16 );
-    return l;
-  }
-  return -1;
+String ESPert_WiFi::getLocalIP() {
+  IPAddress ip =  WiFi.localIP();
+  char textID[32] = {'\0'};
+  sprintf(textID, "%i.%i.%i.%i", ip[0], ip[1], ip[2], ip[3]);
+  return String(textID);
 }
 
+String ESPert_WiFi::getAPIP() {
+  IPAddress ip =  WiFi.softAPIP();
+  char textID[32] = {'\0'};
+  sprintf(textID, "%i.%i.%i.%i", ip[0], ip[1], ip[2], ip[3]);
+  return String(textID);
+}
+
+void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int *progress) {
+  if (_espert->oled.isReady()) {
+    _espert->oled.setCursor(x, y);
+    _espert->oled.setTextColor(ESPERT_BLACK);
+    _espert->oled.print("...", false);
+    _espert->oled.setTextColor(ESPERT_WHITE);
+    _espert->oled.setCursor(x, y);
+
+    if (progress) {
+      for (int i = 1; i <= *progress; i++) {
+        _espert->oled.print(".", false);
+      }
+
+      _espert->oled.update();
+
+      if (++(*progress) > 3) {
+        *progress = 0;
+      }
+    }
+
+    ESP.wdtFeed();
+  }
+}
+
+// ****************************************
+// GroveButton class
+// ****************************************
+bool ESPert_GroveButton::isOn() {
+  return !ESPert_Button::isOn();
+}
+
+bool ESPert_GroveButton::isOff() {
+  return !ESPert_Button::isOff();
+}
+
+bool ESPert_GroveButton::get() {
+  return !ESPert_Button::get();
+}
+
+// *************************************************
+// GroveLED class
+// *************************************************
+void ESPert_GroveLED::on() {
+  ESPert_LED::set(false);
+}
+
+void ESPert_GroveLED::off() {
+  ESPert_LED::set(true);
+}
+
+void ESPert_GroveLED::set(bool state) {
+  ESPert_LED::set(!state);
+}
+
+int ESPert_GroveLED::get() {
+  return !ESPert_LED::get();
+}
+
+// *************************************************
+// GroveRelay class
+// *************************************************
+void ESPert_GroveRelay::on() {
+  ESPert_LED::set(false);
+}
+
+void ESPert_GroveRelay::off() {
+  ESPert_LED::set(true);
+}
+
+void ESPert_GroveRelay::set(bool state) {
+  ESPert_LED::set(!state);
+}
+
+int ESPert_GroveRelay::get() {
+  return !ESPert_LED::get();
+}

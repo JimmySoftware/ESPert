@@ -3,27 +3,30 @@
 ESPert espert;
 
 void setup() {
-  // put your setup code here, to run once:
   espert.init();
-  // Use espert.DHT.init( gpio, type );
+
+  espert.oled.init();
+  delay(2000);
+
+  // Use espert.dht.init(gpio, type);
   // Type can be DHT11 or DHT22
   // Defualt will use DHT22 on GPIO12
-  espert.DHT.init();
-  
-  espert.OLED.init();
-  espert.OLED.clear();
+  espert.dht.init();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  int t = espert.DHT.getTemperature();
-  int h = espert.DHT.getHumidity();
+  bool isFarenheit = false;
+  float t = espert.dht.getTemperature(isFarenheit);
+  float h = espert.dht.getHumidity();
 
-  char text[64];
-  sprintf(text, "Humidity: %i %%  \nTemperature: %i C  ", h, t);
-  espert.OLED.println(text);
+  if (!isnan(t) && !isnan(h)) {
+    String dht = "Temperature: " + String(t) + (isFarenheit ?  " F" : " C") + "\n";
+    dht += "Humidity...: " + String(h) + " %\n";
 
-  espert.println(text);
+    espert.oled.clear();
+    espert.oled.println(dht);
+    espert.println(dht);
+  }
 
-  delay( 5000 );
+  delay(5000);
 }

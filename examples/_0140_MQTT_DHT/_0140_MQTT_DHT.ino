@@ -1,65 +1,51 @@
 #include <ESPert.h>
 
 ESPert espert;
+String outTopic = "ESPert/" + String(espert.getChipId()) + "/DHT";
 
-// Topics
-String outTopic     = "ESPert/" + String(espert.getChipId()) + "/DHT"; 
-
-// MQTT server address
-IPAddress mqtt_server(192,168,77,1);
-//char* mqtt_server = "mqtt.espert.io";
-
-bool bWebOK = false;
- 
 void setup() {
   espert.init();
-  espert.println( "Press USER button to turn on LED." );
-  espert.mqtt.init( mqtt_server, 1883 );
+  espert.mqtt.init("192.168.77.1", 1883);
+  espert.dht.init();
 
-  espert.DHT.init(12,DHT22);
-  
-  espert.OLED.init();
-  espert.OLED.clear();
-  espert.OLED.println( espert.getId() );
-  espert.OLED.println( "" );
+  espert.oled.init();
+  delay(2000);
+
+  espert.oled.clear();
+  espert.oled.println(espert.getId());
+  espert.oled.println();
 
   int mode = espert.wifi.init();
-  if( mode == ESPERT_WIFI_MODE_CONNECT ) {
-    espert.println( ">>> WiFi mode: connected." );
-    espert.OLED.println( "WiFi: connected." );
-    espert.OLED.print( "IP: " );
-    espert.OLED.println( espert.wifi.getLocalIP() );
-    espert.mqtt.connect();
-    espert.print( "MQTT:" );
-    espert.println( "Connected" );
-    bWebOK = true;
-  }
-  else if( mode == ESPERT_WIFI_MODE_DISCONNECT ) {
-    espert.println( ">>> WiFi mode: disconnected." );
-    espert.OLED.println( "WiFi: not connected." );
+
+  if (mode == ESPERT_WIFI_MODE_CONNECT) {
+    espert.println(">>> WiFi mode: connected.");
+    espert.oled.println("WiFi: connected.");
+    espert.oled.print("IP..: ");
+    espert.oled.println(espert.wifi.getLocalIP());
+  } else if (mode == ESPERT_WIFI_MODE_DISCONNECT) {
+    espert.println(">>> WiFi mode: disconnected.");
+    espert.oled.println("WiFi: not connected.");
   }
 }
 
 void loop() {
   espert.loop();
 
-  // put your main code here, to run repeatedly:
-  int t = espert.DHT.getTemperature();
-  int h = espert.DHT.getHumidity();
+  if (espert.mqtt.connect()) {
+    espert.println("MQTT: Connected");
+    espert.println("MQTT: Out Topic " + outTopic);
+  }
 
-  String outString  = "{\"temperature\": \""+String(t)+"\",";
-  outString  = outString + "\"humidity\": \""+String(h)+"\",";
-  outString  = outString + "\"lattitude\": \"1.2786564\",";
-  outString  = outString + "\"longitude\": \"103.8428243\",";
+  float t = espert.dht.getTemperature();
+  float h = espert.dht.getHumidity();
 
-  outString = outString + "\"name\": \""+String(espert.getId())+"\"  }";
-
-  espert.println( outString );
-  // Publish temperature
-  espert.mqtt.publish(outTopic, outString);
-
+  if (!isnan(t) && !isnan(h)) {
+    String outString  = "{\"temperature\":\"" + String(t) + "\", ";
+    outString += "\"humidity\":\"" + String(h) + "\", ";
+    outString += "\"name\":\"" + String(espert.getId()) + "\"}";
+    espert.println(outString);
+    espert.mqtt.publish(outTopic, outString);
+  }
 
   delay(5000);
 }
-
-

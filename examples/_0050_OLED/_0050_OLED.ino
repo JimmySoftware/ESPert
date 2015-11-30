@@ -4,43 +4,28 @@ ESPert espert;
 
 void setup() {
   espert.init();
-  espert.OLED.init();
 
+  espert.oled.init();
   delay(2000);
 
-  // Clear the buffer.
-  espert.OLED.clear();
+  espert.oled.clear();
+  espert.oled.setTextSize(1);
+  espert.oled.setTextColor(ESPERT_WHITE);
+  espert.oled.setCursor(0, 0);
 
-  /*espert.OLED.setTextSize(1);
-  espert.OLED.setTextColor(espert_WHITE);
-  espert.OLED.setCursor(0, 0);
-
-  espert.OLED.println("espert ID : ");
-  espert.OLED.println(espert.getId());
-
-  espert.OLED.println("espert Firmware : ");
-  espert.OLED.println(espert.getFirmwareVersion());
-
-  espert.OLED.println("espert Library : ");
-  espert.OLED.println(espert.getLibraryVersion());
-
-  espert.OLED.println("FreeHeap : ");
-  espert.OLED.println(espert.getFreeHeap());*/
-
-  espert.OLED.println("12345678901234567890");
-  espert.OLED.println("2                  2");
-  espert.OLED.println("3                  3");
-  espert.OLED.println("4                  4");
-  espert.OLED.println("5                  5");
-  espert.OLED.println("6                  6");
-  espert.OLED.println("7                  7");
-  espert.OLED.println("8                  8");
-  espert.OLED.println("9                  9");
-  espert.OLED.println("0                  0");
-  espert.OLED.setCursor(6, 8);
-  espert.OLED.println("234567890123456789 1");
+  espert.oled.println("12345678901234567890");
+  espert.oled.println("2                  2");
+  espert.oled.println("3                  3");
+  espert.oled.println("4                  4");
+  espert.oled.println("5                  5");
+  espert.oled.println("6                  6");
+  espert.oled.println("7                  7");
+  espert.oled.println("8                  8");
+  espert.oled.println("9                  9");
+  espert.oled.println("0                  0");
+  espert.oled.setCursor(6, 8);
+  espert.oled.println("234567890123456789 1");
 }
 
 void loop() {
 }
-

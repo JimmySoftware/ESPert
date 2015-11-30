@@ -3,14 +3,19 @@
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <EEPROM.h>
+#include <Wire.h>
+#include <SoftwareSerial.h>
 #include <functional>
 #include <Print.h>
 #include <ESP_Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
-#include <Wire.h>
 #include <DHT.h>
-#include <SoftwareSerial.h>
 #include <PubSubClient.H>
+#include <ArduinoJson.h>
 
 static const float ESPERT_LIBRARY_VERSION = 0.8f;
 
@@ -45,8 +50,8 @@ static const float ESPERT_LIBRARY_VERSION = 0.8f;
 
 #endif // ESPERT_DEBUG
 
-#define ESPERT_BLACK 0
-#define ESPERT_WHITE 1
+#define ESPERT_BLACK   0
+#define ESPERT_WHITE   1
 #define ESPERT_INVERSE 2
 
 #define ESPERT_WIFI_MODE_DISCONNECT  0
@@ -54,74 +59,142 @@ static const float ESPERT_LIBRARY_VERSION = 0.8f;
 #define ESPERT_WIFI_MODE_SMARTCONFIG 2
 #define ESPERT_WIFI_MODE_SETTINGAP   3
 
-#define MAX_NETWORKS 32
+static int ESPertBoardType = ESPERT_BOARD_GENERIC;
 
-class ESPert_WiFi 
+static int ESPERT_PIN_LED = 16;
+static int ESPERT_PIN_BUTTON = 2;
+static int ESPERT_PIN_SDA = 4;
+static int ESPERT_PIN_SCL = 5;
+static int ESPERT_PIN_DHT = 12;
+
+static int ESPERT_DHT_TYPE = DHT22;
+
+static const long ESPertFlashID[] = {0x1640EF, 0x1340C8, 0x1340EF}; // Little Endian
+static const String ESPertFlashDesc[] = {"WINBOND W25Q32: 32M-bit / 4M-byte", "GIGADEVICE GD25Q40 4M-bit / 512K-byte", "WINBOND W25Q40 4M-bit / 512K-byte"};
+
+static ESP8266WebServer *ESPertServer = NULL;
+static MDNSResponder ESPertMDNS;
+
+static String ESPertNetworks[32] = {""};
+static int ESPertNumberOfNetworks = 0;
+static String ESPertSSID = "";
+static String ESPertPassword = "";
+static String ESPertContentHeader = "";
+static String ESPertContentFooter = "";
+static String ESPertSSIDHeader = "";
+static String ESPertSSIDFooter = "";
+static String ESPertContent = "";
+
+static String ESPertReadString; // rx tx buffer
+
+class ESPert_SoftwareSerial : public Stream
 {
-public:
-    int  wifiMode;
-
-    int  init();
-    int  getMode() { return wifiMode; };
-    void setAutoConnect( bool bAuto );
-    bool smartConfig();
-    void initSetupAP(void);
-    void initSetupServer();
-    bool test(void);
-    void disconnect( bool reset=true);
-    String getLocalIP();
-    String getAPIP();
+  public:
+    SoftwareSerial *swSerial;
+    using Print::write;
+    ESPert_SoftwareSerial();
+    void init(int rx = 12, int tx = 14, int buffer = 128);
+    String readString();
+    virtual size_t write(uint8_t byte);
+    virtual int read();
+    virtual int available();
+    virtual void flush();
+    int peek();
+    void begin(int baud = 9600);
 };
 
-class ESPert_LED
+class ESPert_BLE
 {
-    private:
-        int pin_LED;
-        
-    public:
-        void init( int pin=-1);
-        void on();
-        void off();
-        void set( bool state );
-        int get();
+  private:
+    ESPert_SoftwareSerial *swSerial;
+
+  public:
+    ESPert_BLE();
+    bool init(ESPert_SoftwareSerial *swSer);
+    String getFirmwareVersion();
+    bool isOn();
+    bool isOff();
+    bool on();
+    bool off();
+    String getUUID();
+    int getMajor();
+    int getMinor();
+    int getTXPower();
 };
 
 class ESPert_Button
 {
-    private:
-        bool currentButtonStatus;
-        long buttonPressTime;
+  private:
+    bool currentButtonStatus;
+    long buttonPressTime;
+    int buttonPin;
+    bool isLongPressEnabled;
 
-        void resetPressTime();
-        int  pin_button;
-        
-    public:
-        long getPressTime();
-        void init( int pin=-1 );
-        virtual bool isOn();
-        virtual bool isOff();
-        virtual bool get();
-        bool isLongPress();
+  public:
+    ESPert_Button();
+    void init(int pin = -1);
+    long getPressTime();
+    void resetPressTime();
+    bool isLongPress();
+    void enableLongPress();
+    void disableLongPress();
+    virtual bool isOn();
+    virtual bool isOff();
+    virtual bool get();
 };
 
-class ESPert_GroveButton: public ESPert_Button
+class ESPert_DHT
 {
-    private:
-    public:
-        virtual bool isOn();
-        virtual bool isOff();
-        virtual bool get();
+  private:
+    DHT *dht;
+    int dhtPin;
+    int dhtType;
+
+  public:
+    ESPert_DHT();
+    void init(int gpio = -1, int type = -1, int tx = -1);
+    bool isReady();
+    float getHumidity();
+    float getTemperature(bool isFarenheit = false);
 };
 
-class ESPert_GroveRelay: public ESPert_LED
+class ESPert_EEPROM
 {
-    public:
-        void on();
-        void off();
-        void set( bool state );
-        int get();
+  public:
+    String read(int index, int length);
+    int write(int index, String text);
 };
 
+class ESPert_JSON
+{
+  private:
+    char* json;
+    JsonObject* root;
+    DynamicJsonBuffer jsonBuffer;
+
+  public:
+    ESPert_JSON();
+    bool init(String payload);
+    bool containsKey(String key);
+    String get(String key);
+    void release();
+};
+
+class ESPert_LED
+{
+  private:
+    int ledPin;
+
+  public:
+    ESPert_LED();
+    void init(int pin = -1);
+    void on();
+    void off();
+    void set(bool state);
+    int get();
+    bool isOn();
+    bool isOff();
+};
 
 class ESPert_OLED
 {
@@ -129,135 +202,141 @@ class ESPert_OLED
     Adafruit_SSD1306 *display;
 
   public:
+    ESPert_OLED();
     void init();
     bool isReady();
-    void clear();
+    void clear(bool clearImmediately = true);
     void setTextSize(uint8_t s);
     void setTextColor(uint16_t c);
     void setTextColor(uint16_t c, uint16_t bg);
     void setCursor(int16_t x, int16_t y);
-    void drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color);
-    void print(const String &s);
-    void print(double f, int p = 2);
-    void print(int i);
-    void println(const String &s);
-    void println(double f, int p = 2);
-    void println(int i);
-};
-
-class ESPert_DHT
-{
-  private:
-    bool hutmp;
-    DHT *dht;
-    int pin_dht;
-    int dht_type;
-
-  public:
-    void init( int pin=-1, int type=-1 );
-    bool isReady();
-    int getHumidity();
-    int getTemperature();
-};
-
-class ESPert_SoftwareSerial : public Stream
-{
-    public:
-        ESPert_SoftwareSerial();
-        void init( int rx=12, int tx=14, int buffer=128 );
-        String readString();
-        //void write( String str );
-        virtual size_t write(uint8_t byte);
-        virtual int read();
-        virtual int available();
-        virtual void flush();
-        int peek();
-
-        void begin( int baud=9600 );
-        
-        SoftwareSerial  *swSerial;
-        
-        using Print::write;
-
-};
-
-class ESPert_BLE 
-{
-    ESPert_SoftwareSerial *swSerial;
-    
-    public:
-        bool init( ESPert_SoftwareSerial *swSer );
-        String getFirmwareVersion();
-        bool isOn();
-        bool on();
-        bool off();
-        
-        String getUUID();
-        int getMajor();
-        int getMinor();
-        int getTXPower();
-
+    int16_t getCursorX();
+    int16_t getCursorY();
+    void drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately = true);
+    void print(const String &s = "", bool printImmediately = true);
+    void print(double f, int p = 2, bool printImmediately = true);
+    void print(int i, bool printImmediately = true);
+    void println(const String &s = "", bool printImmediately = true);
+    void println(double f, int p = 2, bool printImmediately = true);
+    void println(int i, bool printImmediately = true);
+    void update();
 };
 
 class ESPert_MQTT
 {
-    PubSubClient::callback_t callback;
-    
-    public:
-        void init( IPAddress server, int port );
-        void init( String server, int port );
-        void setCallback( PubSubClient::callback_t cb=NULL );
-        
-        String getClientName();
-        void publish( String topic, String value );
-        void subscribe( String topic );
-        void connect();
-        PubSubClient * getPubSubClient(); 
+  private:
+    PubSubClient *mqttClient = NULL;
+    PubSubClient::callback_t mqttCallback;
+    String mqttUser;
+    String mqttPassword;
+
+  public:
+    ESPert_MQTT();
+    void init(IPAddress server, int port, String user = "", String password = "", PubSubClient::callback_t cb = NULL);
+    void init(IPAddress server, int port, PubSubClient::callback_t cb);
+    void init(String server, int port, String user = "", String password = "", PubSubClient::callback_t cb = NULL);
+    void init(String server, int port, PubSubClient::callback_t cb);
+    void setCallback(PubSubClient::callback_t cb = NULL);
+    String getClientName();
+    void publish(String topic, String value);
+    void subscribe(String topic);
+    bool connect();
+    PubSubClient *getPubSubClient();
 };
 
+class ESPert_WiFi
+{
+  private:
+    int wifiMode;
+    void drawProgress(int16_t x, int16_t y, int *progress = NULL);
+
+  public:
+    ESPert_WiFi();
+    int init();
+    int getMode();
+    void setAutoConnect(bool bAuto);
+    bool smartConfig();
+    void initSetupAP(void);
+    void initSetupServer();
+    bool test(int timeOut = -1);
+    void disconnect(bool reset = true);
+    String getLocalIP();
+    String getAPIP();
+};
+
+class ESPert_GroveButton: public ESPert_Button
+{
+  public:
+    virtual bool isOn();
+    virtual bool isOff();
+    virtual bool get();
+};
+
+class ESPert_GroveLED: public ESPert_LED
+{
+  public:
+    void on();
+    void off();
+    void set(bool state);
+    int get();
+};
+
+class ESPert_GroveRelay: public ESPert_LED
+{
+  public:
+    void on();
+    void off();
+    void set(bool state);
+    int get();
+};
+
+class ESPert_Grove
+{
+  public:
+    ESPert_GroveButton    button;
+    ESPert_GroveLED       led;
+    ESPert_GroveRelay     relay;
+};
 
 class ESPert : public Print
 {
-    private:
-    
-    public:
-        ESPert_LED      LED;
-        ESPert_Button   button;
-        ESPert_OLED     OLED;
-        ESPert_DHT      DHT;
-        ESPert_WiFi     wifi;
-        ESPert_SoftwareSerial   swSerial;
-        ESPert_BLE              ble;
-        ESPert_MQTT             mqtt;
-        
-        String EEPROM_Read( int index, int length );
-        int EEPROM_Write( int index, String text );
+  public:
+    ESPert_BLE            ble;
+    ESPert_Button         button;
+    ESPert_DHT            dht;
+    ESPert_EEPROM         eeprom;
+    ESPert_Grove          grove;
+    ESPert_JSON           json;
+    ESPert_LED            led;
+    ESPert_OLED           oled;
+    ESPert_MQTT           mqtt;
+    ESPert_SoftwareSerial swSerial;
+    ESPert_WiFi           wifi;
 
-    public:
-        ESPert();
-        void init( int type = ESPERT_BOARD_ESPRESSO_LITE );
-        void loop();
-    
-        #if ARDUINO >= 100
-            virtual size_t write(uint8_t);
-        #else
-            virtual void   write(uint8_t);
-        #endif     
-        
-        String getId();
-        float getLibraryVersion();
-        uint32_t getFreeHeap();
-        uint32_t getChipId();
-        uint32_t getFlashChipId();
-        String getFlashChipInfo();
-        uint32_t getFlashChipRealSize();
-        uint32_t getFlashChipSize();
-        uint32_t getFlashChipSpeed();
-        uint32_t getFlashChipSizeByChipId();
-        inline uint32_t getCycleCount() {
-            return ESP.getCycleCount();
-        };
+    ESPert();
+    void init(int type = ESPERT_BOARD_ESPRESSO_LITE);
+    void loop();
+    String getId();
+    float getLibraryVersion();
+    uint32_t getFreeHeap();
+    uint32_t getChipId();
+    uint32_t getFlashChipId();
+    String getFlashChipInfo();
+    uint32_t getFlashChipRealSize();
+    uint32_t getFlashChipSize();
+    uint32_t getFlashChipSpeed();
+    uint32_t getFlashChipSizeByChipId();
+    String macToString(const uint8_t* mac);
+
+    inline uint32_t getCycleCount() {
+      return ESP.getCycleCount();
+    };
+
+#if ARDUINO >= 100
+    virtual size_t write(uint8_t);
+#else
+    virtual void write(uint8_t);
+#endif
 };
-
 
 #endif //__ESPERT_h__
