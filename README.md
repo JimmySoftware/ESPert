@@ -13,7 +13,8 @@ Please proceed to follow the procedures as prescribed in the ESPresso Lite tutor
 - From menu Tools > Board select Generic ESP8266 Module
 
 # ESPert library
-- Download or Clone ESPert library and examples from https://github.com/JimmySoftware/ESPert
+- Download or Clone ESPert library and examples from https://github.com/JimmySoftware/ESPert 
+- Copy to Arduino Library directory (~/Document/Arduino/Libraries)
 
 # Install dependency for ESPert
 Open Library Manager (menu Sketch > Include Library > Manage Libraries…) then install the following libraries
