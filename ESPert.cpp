@@ -52,60 +52,6 @@ void ESPert::write(uint8_t c) {
 #endif
 }
 
-// ****************************************
-// Device Info
-// ****************************************
-String ESPert::getId() {
-  char textID[16] = {'\0'};
-  sprintf(textID, "ESPert-%lu", ESP.getChipId());
-  return String(textID);
-}
-
-float ESPert::getLibraryVersion() {
-  return ESPERT_LIBRARY_VERSION;
-}
-
-uint32_t ESPert::getFreeHeap() {
-  return ESP.getFreeHeap();
-}
-
-uint32_t ESPert::getChipId() {
-  return ESP.getChipId();
-}
-
-uint32_t ESPert::getFlashChipId() {
-  return ESP.getFlashChipId();
-}
-
-String ESPert::getFlashChipInfo() {
-  int flashChipID = ESP.getFlashChipId();
-  int arraySize = (sizeof(ESPertFlashID) / sizeof(*ESPertFlashID));
-
-  for (int i = 0; i < arraySize; i++) {
-    if (ESP.getFlashChipId() == ESPertFlashID[i]) {
-      return ESPertFlashDesc[i];
-    }
-  }
-
-  return "Unknown Flash Chip";
-}
-
-uint32_t ESPert::getFlashChipRealSize() {
-  return ESP.getFlashChipRealSize();
-}
-
-uint32_t ESPert::getFlashChipSize() {
-  return ESP.getFlashChipSize();
-}
-
-uint32_t ESPert::getFlashChipSpeed() {
-  return ESP.getFlashChipSpeed();
-}
-
-uint32_t ESPert::getFlashChipSizeByChipId() {
-  return ESP.getFlashChipSizeByChipId();
-}
-
 String ESPert::macToString(const uint8_t* mac) {
   String result = "";
 
@@ -118,6 +64,60 @@ String ESPert::macToString(const uint8_t* mac) {
   }
 
   return result;
+}
+
+// ****************************************
+// Device Info class
+// ****************************************
+String ESPert_Info::getId() {
+  char textID[16] = {'\0'};
+  sprintf(textID, "ESPert-%lu", ESP.getChipId());
+  return String(textID);
+}
+
+float ESPert_Info::getLibraryVersion() {
+  return ESPERT_LIBRARY_VERSION;
+}
+
+uint32_t ESPert_Info::getFreeHeap() {
+  return ESP.getFreeHeap();
+}
+
+uint32_t ESPert_Info::getChipId() {
+  return ESP.getChipId();
+}
+
+uint32_t ESPert_Info::getFlashChipId() {
+  return ESP.getFlashChipId();
+}
+
+String ESPert_Info::getFlashChipInfo() {
+  int flashChipID = ESP.getFlashChipId();
+  int arraySize = (sizeof(ESPertFlashID) / sizeof(*ESPertFlashID));
+
+  for (int i = 0; i < arraySize; i++) {
+    if (ESP.getFlashChipId() == ESPertFlashID[i]) {
+      return ESPertFlashDesc[i];
+    }
+  }
+
+  return "Unknown Flash Chip";
+}
+
+uint32_t ESPert_Info::getFlashChipRealSize() {
+  return ESP.getFlashChipRealSize();
+}
+
+uint32_t ESPert_Info::getFlashChipSize() {
+  return ESP.getFlashChipSize();
+}
+
+uint32_t ESPert_Info::getFlashChipSpeed() {
+  return ESP.getFlashChipSpeed();
+}
+
+uint32_t ESPert_Info::getFlashChipSizeByChipId() {
+  return ESP.getFlashChipSizeByChipId();
 }
 
 // ****************************************
@@ -1160,7 +1160,7 @@ void ESPert_WiFi::initSetupAP(void) {
   }
 
   delay(100);
-  WiFi.softAP(_espert->getId().c_str());
+  WiFi.softAP(_espert->info.getId().c_str());
 
   _espert->println();
   _espert->println("ESPert: WiFi connected, softAP IP " + _espert->wifi.getAPIP());

@@ -30,7 +30,7 @@ void setup() {
   delay(2000);
 
   espert.oled.clear();
-  espert.oled.println(espert.getId());
+  espert.oled.println(espert.info.getId());
   espert.oled.println();
 
   int mode = espert.wifi.init();

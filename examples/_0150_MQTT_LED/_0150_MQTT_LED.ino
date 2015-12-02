@@ -2,7 +2,7 @@
 
 ESPert espert;
 int currentSwitch = true;
-String outTopic = "ESPert/" + String(espert.getChipId()) + "/Button";
+String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/Button";
 String inTopic = outTopic;
 
 void mqttCallback(const MQTT::Publish& pub) {
@@ -34,7 +34,7 @@ void setup() {
   espert.println("Press USER button to turn on LED.");
 
   espert.oled.clear();
-  espert.oled.println(espert.getId());
+  espert.oled.println(espert.info.getId());
   espert.oled.println();
 
   int mode = espert.wifi.init();
@@ -44,7 +44,6 @@ void setup() {
     espert.oled.println("WiFi: connected.");
     espert.oled.print("IP..: ");
     espert.oled.println(espert.wifi.getLocalIP());
-    espert.button.disableLongPress();
   } else if (mode == ESPERT_WIFI_MODE_DISCONNECT) {
     espert.println(">>> WiFi mode: disconnected.");
     espert.oled.println("WiFi: not connected.");
@@ -52,8 +51,6 @@ void setup() {
 }
 
 void loop() {
-  espert.loop();
-
   if (espert.mqtt.connect()) {
     espert.println("MQTT: Connected");
     espert.println("MQTT: Out Topic " + outTopic);
@@ -65,7 +62,7 @@ void loop() {
 
   if (buttonPressed != currentSwitch) {
     String outString  = "{\"button\":\"" + String(buttonPressed ? 1 : 0) + "\", ";
-    outString += "\"name\":\"" + String(espert.getId()) + "\"}";
+    outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
     espert.println("Send...: " + outString);
     espert.mqtt.publish(outTopic, outString);
     currentSwitch = buttonPressed;

@@ -1,7 +1,7 @@
 #include <ESPert.h>
 
 ESPert espert;
-String outTopic = "ESPert/" + String(espert.getChipId()) + "/DHT";
+String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/DHT";
 
 void setup() {
   espert.init();
@@ -12,7 +12,7 @@ void setup() {
   delay(2000);
 
   espert.oled.clear();
-  espert.oled.println(espert.getId());
+  espert.oled.println(espert.info.getId());
   espert.oled.println();
 
   int mode = espert.wifi.init();
@@ -29,8 +29,6 @@ void setup() {
 }
 
 void loop() {
-  espert.loop();
-
   if (espert.mqtt.connect()) {
     espert.println("MQTT: Connected");
     espert.println("MQTT: Out Topic " + outTopic);
@@ -42,7 +40,7 @@ void loop() {
   if (!isnan(t) && !isnan(h)) {
     String outString  = "{\"temperature\":\"" + String(t) + "\", ";
     outString += "\"humidity\":\"" + String(h) + "\", ";
-    outString += "\"name\":\"" + String(espert.getId()) + "\"}";
+    outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
     espert.println(outString);
     espert.mqtt.publish(outTopic, outString);
   }

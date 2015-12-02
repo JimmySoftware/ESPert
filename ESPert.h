@@ -165,6 +165,25 @@ class ESPert_EEPROM
     int write(int index, String text);
 };
 
+class ESPert_Info
+{
+  public:
+    String getId();
+    float getLibraryVersion();
+    uint32_t getFreeHeap();
+    uint32_t getChipId();
+    uint32_t getFlashChipId();
+    String getFlashChipInfo();
+    uint32_t getFlashChipRealSize();
+    uint32_t getFlashChipSize();
+    uint32_t getFlashChipSpeed();
+    uint32_t getFlashChipSizeByChipId();
+
+    inline uint32_t getCycleCount() {
+      return ESP.getCycleCount();
+    };
+};
+
 class ESPert_JSON
 {
   private:
@@ -306,6 +325,7 @@ class ESPert : public Print
     ESPert_DHT            dht;
     ESPert_EEPROM         eeprom;
     ESPert_Grove          grove;
+    ESPert_Info           info;
     ESPert_JSON           json;
     ESPert_LED            led;
     ESPert_OLED           oled;
@@ -316,21 +336,7 @@ class ESPert : public Print
     ESPert();
     void init(int type = ESPERT_BOARD_ESPRESSO_LITE);
     void loop();
-    String getId();
-    float getLibraryVersion();
-    uint32_t getFreeHeap();
-    uint32_t getChipId();
-    uint32_t getFlashChipId();
-    String getFlashChipInfo();
-    uint32_t getFlashChipRealSize();
-    uint32_t getFlashChipSize();
-    uint32_t getFlashChipSpeed();
-    uint32_t getFlashChipSizeByChipId();
     String macToString(const uint8_t* mac);
-
-    inline uint32_t getCycleCount() {
-      return ESP.getCycleCount();
-    };
 
 #if ARDUINO >= 100
     virtual size_t write(uint8_t);
