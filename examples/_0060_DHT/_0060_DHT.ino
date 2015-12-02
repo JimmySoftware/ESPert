@@ -6,12 +6,13 @@ void setup() {
   espert.init();
 
   espert.oled.init();
-  delay(2000);
 
   // Use espert.dht.init(gpio, type);
   // Type can be DHT11 or DHT22
   // Defualt will use DHT22 on GPIO12
   espert.dht.init();
+
+  delay(2000);
 }
 
 void loop() {
