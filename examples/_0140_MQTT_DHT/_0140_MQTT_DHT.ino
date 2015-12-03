@@ -1,11 +1,14 @@
 #include <ESPert.h>
 
+IPAddress mqtt_server(192,168,77,1);
+//char* mqtt_server = "mqtt.espert.io";
+
 ESPert espert;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/DHT";
 
 void setup() {
   espert.init();
-  espert.mqtt.init("192.168.77.1", 1883);
+  espert.mqtt.init(mqtt_server, 1883);
   espert.dht.init();
 
   espert.oled.init();

@@ -3,14 +3,14 @@
 ESPert espert;
 
 IPAddress mqtt_server(192,168,77,1);
-//char* mqtt_server = "mqtt.tespa.io";
+//char* mqtt_server = "mqtt.espert.io";
 
 int currentSwitch = true;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/Button";
 
 void setup() {
   espert.init(ESPERT_BOARD_ESPRESSO_LITE);
-  espert.mqtt.init("192.168.77.1", 1883);
+  espert.mqtt.init(mqtt_server, 1883);
 
   espert.oled.init();
   delay(2000);

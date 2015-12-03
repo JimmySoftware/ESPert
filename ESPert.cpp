@@ -825,6 +825,7 @@ void ESPert_OLED::update() {
 // ****************************************
 // MQTT class
 // ****************************************
+/*
 ESPert_MQTT::ESPert_MQTT()
 {
   mqttClient = NULL;
@@ -934,7 +935,122 @@ bool ESPert_MQTT::connect() {
 
   return reconnected;
 }
+*/
 
+// ****************************************
+// MQTT2 class
+// ****************************************
+ESPert_MQTT2::ESPert_MQTT2()
+{
+  mqttClient = NULL;
+  callback = NULL;
+  mqttUser = "";
+  mqttPassword = "";
+}
+
+void ESPert_MQTT2::init(IPAddress server, int port, String user, String password, MQTT_CALLBACK_SIGNATURE) {
+  mqttUser = user;
+  mqttPassword = password;
+  setCallback(callback);
+
+  if (mqttClient) {
+    if (mqttClient->connected())
+    {
+      mqttClient->disconnect();
+    }
+
+    delete mqttClient;
+    mqttClient = NULL;
+  }
+
+  mqttClient = new PubSubClient(_client);
+  mqttClient->setServer(server, 1883);
+}
+
+void ESPert_MQTT2::init(IPAddress server, int port, MQTT_CALLBACK_SIGNATURE) {
+  init(server, port, "", "", callback);
+}
+
+void ESPert_MQTT2::init(String server, int port, String user, String password, MQTT_CALLBACK_SIGNATURE) {
+  mqttUser = user;
+  mqttPassword = password;
+  setCallback(callback);
+
+  if (mqttClient) {
+    if (mqttClient->connected())
+    {
+      mqttClient->disconnect();
+    }
+
+    delete mqttClient;
+    mqttClient = NULL;
+  }
+
+  mqttClient = new PubSubClient(_client);
+  mqttClient->setServer(server.c_str(), 1883);
+}
+
+void ESPert_MQTT2::init(String server, int port, MQTT_CALLBACK_SIGNATURE) {
+  init(server, port, "", "", callback);
+}
+
+void ESPert_MQTT2::setCallback(MQTT_CALLBACK_SIGNATURE) {
+  this->callback = callback;
+}
+
+PubSubClient *ESPert_MQTT2::getPubSubClient() {
+  return mqttClient;
+}
+
+String ESPert_MQTT2::getClientName() {
+  String clientName = "";
+  uint8_t mac[6] = {0};
+
+  clientName += "ESPert-";
+  WiFi.macAddress(mac);
+  clientName += _espert->macToString(mac);
+  clientName += "-";
+  clientName += String(micros() & 0xff, 16);
+  return clientName;
+}
+
+bool ESPert_MQTT2::connect() {
+  bool reconnected = false;
+
+  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
+    if (!mqttClient->connected()) {
+      String cn = getClientName();
+
+      if (mqttUser.length() > 0) {
+        reconnected = mqttClient->connect((char *)cn.c_str(), mqttUser.c_str(), mqttPassword.c_str());
+      } else {
+        reconnected = mqttClient->connect((char *)cn.c_str());
+      }
+
+      if (reconnected) {
+        if (this->callback) {
+          mqttClient->setCallback(this->callback);
+        }
+      }
+    }
+
+    mqttClient->loop();
+  }
+
+  return reconnected;
+}
+
+void ESPert_MQTT2::publish(String topic, String value) {
+  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
+    mqttClient->publish(topic.c_str(), (char *) value.c_str());
+  }
+}
+
+void ESPert_MQTT2::subscribe(String topic) {
+  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
+    mqttClient->subscribe(topic.c_str());
+  }
+}
 // *******************************************
 // WiFi class
 // *******************************************

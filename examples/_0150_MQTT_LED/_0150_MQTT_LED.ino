@@ -1,15 +1,28 @@
 #include <ESPert.h>
 
 ESPert espert;
+
+IPAddress mqtt_server(192,168,77,1);
+//char* mqtt_server = "mqtt.espert.io";
+
 int currentSwitch = true;
-String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/Button";
-String inTopic = outTopic;
+String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/LED";
 
-void mqttCallback(const MQTT::Publish& pub) {
-  espert.println("Receive: " + pub.payload_string());
-  String key = "button";
+String inTopic = "ESPert/" + String(espert.info.getChipId()) + "/LED";;
 
-  if (espert.json.init(pub.payload_string()) && espert.json.containsKey(key)) {
+void callback(char* topic, byte* payload, unsigned int length) {
+  byte* p = (byte*)malloc(length+1);
+  // Copy the payload to the new buffer
+  memcpy(p,payload,length);
+  p[length] = 0;
+  String strPayload = String((char *)p);
+  free(p);
+  
+  espert.println("Receive: " + strPayload);
+  String key = "cmd";
+
+  if (espert.json.init(strPayload) && espert.json.containsKey(key)) {
+  
     String value = espert.json.get(key);
 
     if (value == "0") {
@@ -20,13 +33,16 @@ void mqttCallback(const MQTT::Publish& pub) {
       espert.println("LED: On");
     }
 
-    espert.println();
+    String outString  = "{\"status\":\"" + String(espert.led.isOn() ? 1 : 0) + "\", ";
+    outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
+    espert.println("Send...: " + outString);
+    espert.mqtt.publish(outTopic, outString);
   }
 }
 
 void setup() {
   espert.init();
-  espert.mqtt.init("192.168.77.1", 1883, mqttCallback);
+  espert.mqtt.init(mqtt_server, 1883, callback);
 
   espert.oled.init();
   delay(2000);
@@ -61,10 +77,11 @@ void loop() {
   bool buttonPressed = espert.button.isOn();
 
   if (buttonPressed != currentSwitch) {
-    String outString  = "{\"button\":\"" + String(buttonPressed ? 1 : 0) + "\", ";
+    String outString  = "{\"cmd\":\"" + String(buttonPressed ? 1 : 0) + "\", ";
     outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
     espert.println("Send...: " + outString);
     espert.mqtt.publish(outTopic, outString);
     currentSwitch = buttonPressed;
   }
 }
+

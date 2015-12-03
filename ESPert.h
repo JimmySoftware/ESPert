@@ -14,7 +14,8 @@
 #include <ESP_Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
 #include <DHT.h>
-#include <SimplePubSubClient.h>
+//#include <SimplePubSubClient.h>
+#include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <JS_HttpClient.h>
 
@@ -242,6 +243,7 @@ class ESPert_OLED
     void update();
 };
 
+/*
 class ESPert_MQTT
 {
   private:
@@ -262,6 +264,32 @@ class ESPert_MQTT
     void subscribe(String topic);
     bool connect();
     SimplePubSubClient *getSimplePubSubClient();
+};
+*/
+
+class ESPert_MQTT2
+{
+  private:
+    PubSubClient *mqttClient = NULL;
+    MQTT_CALLBACK_SIGNATURE;
+    String mqttUser;
+    String mqttPassword;
+    WiFiClient _client;
+
+  public:
+    ESPert_MQTT2();
+    void init(IPAddress server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
+    void init(IPAddress server, int port, MQTT_CALLBACK_SIGNATURE);
+    void init(String server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
+    void init(String server, int port, MQTT_CALLBACK_SIGNATURE);
+    
+    void setCallback(MQTT_CALLBACK_SIGNATURE = NULL);
+    
+    String getClientName();
+    PubSubClient *getPubSubClient();
+    void publish(String topic, String value);
+    void subscribe(String topic);
+    bool connect();
 };
 
 class ESPert_WiFi
@@ -332,7 +360,7 @@ class ESPert : public Print
     ESPert_JSON           json;
     ESPert_LED            led;
     ESPert_OLED           oled;
-    ESPert_MQTT           mqtt;
+    ESPert_MQTT2          mqtt;
     ESPert_SoftwareSerial swSerial;
     ESPert_WiFi           wifi;
 
