@@ -21,10 +21,12 @@ void setup() {
   espert.oled.println("6                  6");
   espert.oled.println("7                  7");
   espert.oled.println("8                  8");
-  espert.oled.println("9                  9");
-  espert.oled.println("0                  0");
-  espert.oled.setCursor(6, 8);
+  espert.oled.setCursor(6, 16);
   espert.oled.println("234567890123456789 1");
+  espert.oled.setCursor(6, 32);
+  espert.oled.println("234567890123456789 1");
+
+  espert.oled.update();
 }
 
 void loop() {

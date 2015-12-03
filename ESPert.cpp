@@ -1,4 +1,5 @@
 #include "ESPert.h"
+#include "logo.h"
 
 static ESPert *_espert = NULL;
 
@@ -50,6 +51,7 @@ void ESPert::loop() {
       wifi.setAutoConnect(true);
     }
   }
+  oled.update();
 }
 
 #if ARDUINO >= 100
@@ -673,15 +675,21 @@ ESPert_OLED::ESPert_OLED() {
 
 void ESPert_OLED::init() {
   if (!display) {
-    display = new Adafruit_SSD1306(4);
+    display = new SSD1306(0x3c, ESPERT_PIN_SDA, ESPERT_PIN_SCL);
 
 #if (SSD1306_LCDHEIGHT != 64)
-#error("Height incorrect, please fix Adafruit_SSD1306.h!");
+//#error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
     if (display) {
       // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-      display->begin(SSD1306_SWITCHCAPVCC, 0x3C, true, ESPERT_PIN_SDA, ESPERT_PIN_SCL);  // initialize with the I2C addr 0x3D (for the 128x64)
+      //display->begin(SSD1306_SWITCHCAPVCC, 0x3C, true, ESPERT_PIN_SDA, ESPERT_PIN_SCL);  // initialize with the I2C addr 0x3D (for the 128x64)
+      display->init();
+      display->flipScreenVertically();
+
+      display->clear();
+      drawBitmap(0, 0, logo, 128, 64, ESPERT_WHITE, true );
+      delay( 1000 );
       // init done
 
       // Show image buffer on the display hardware.
@@ -703,9 +711,41 @@ bool ESPert_OLED::isReady() {
   return (display ? true : false);
 }
 
+#if ARDUINO >= 100
+size_t ESPert_OLED::write(uint8_t c)
+#else
+void ESPert_OLED::write(uint8_t c)
+#endif
+{
+    char t[2];
+    t[0] = c;
+    t[1] = 0;
+    
+    if( c == 13 ) {
+        update();
+        cursorX = 0;
+        return 1;
+    }
+    else if( c == 10 ) {
+        cursorY += charHeight;
+        return 1;
+    }
+    display->drawString( cursorX, cursorY, String( t ) );
+    cursorX += charWidth;
+    if( (cursorX+charWidth) > maxX ) {
+        cursorX = 0;
+        cursorY += charHeight;
+    }
+    
+    #if ARDUINO >= 100
+        return 1;
+    #endif
+}
+
+
 void ESPert_OLED::clear(bool clearImmediately) {
   if (display) {
-    display->clearDisplay();
+    display->clear();
     setCursor(0, 0);
 
     if (clearImmediately) {
@@ -716,101 +756,36 @@ void ESPert_OLED::clear(bool clearImmediately) {
 
 void ESPert_OLED::setTextSize(uint8_t s) {
   if (display) {
-    display->setTextSize(s);
+    //display->setTextSize(s);
+    charWidth = 6;
+    charHeight = 8;
   }
 }
 
 void ESPert_OLED::setTextColor(uint16_t c) {
   if (display) {
-    display->setTextColor(c);
-  }
-}
-
-void ESPert_OLED::setTextColor(uint16_t c, uint16_t bg) {
-  if (display) {
-    display->setTextColor(c, bg);
+    display->setColor(c);
   }
 }
 
 void ESPert_OLED::setCursor(int16_t x, int16_t y) {
-  if (display) {
-    display->setCursor(x, y);
-  }
+    cursorX = x;
+    cursorY = y;
 }
 
 int16_t ESPert_OLED::getCursorX() {
-  return display->getCursorX();
+  return cursorX;
 }
 
 int16_t ESPert_OLED::getCursorY() {
-  return display->getCursorY();
+  return cursorY;
 }
 
 void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately) {
   if (display) {
-    display->drawBitmap(x, y,  bitmap, w, h, color);
+    display->drawBitmap(x, y, w, h, (const char *)bitmap);
 
     if (drawImmediately) {
-      display->display();
-    }
-  }
-}
-
-void ESPert_OLED::print(const String &s, bool printImmediately) {
-  if (display) {
-    display->print(s);
-
-    if (printImmediately) {
-      display->display();
-    }
-  }
-}
-
-void ESPert_OLED::print(double f, int p, bool printImmediately) {
-  if (display) {
-    display->print(f, p);
-
-    if (printImmediately) {
-      display->display();
-    }
-  }
-}
-
-void ESPert_OLED::print(int i, bool printImmediately) {
-  if (display) {
-    display->print(i);
-
-    if (printImmediately) {
-      display->display();
-    }
-  }
-}
-
-void ESPert_OLED::println(const String &s, bool printImmediately) {
-  if (display) {
-    display->println(s);
-
-    if (printImmediately) {
-      display->display();
-    }
-  }
-}
-
-void ESPert_OLED::println(double f, int p, bool printImmediately) {
-  if (display) {
-    display->println(f, p);
-
-    if (printImmediately) {
-      display->display();
-    }
-  }
-}
-
-void ESPert_OLED::println(int i, bool printImmediately) {
-  if (display) {
-    display->println(i);
-
-    if (printImmediately) {
       display->display();
     }
   }
@@ -822,120 +797,7 @@ void ESPert_OLED::update() {
   }
 }
 
-// ****************************************
-// MQTT class
-// ****************************************
-/*
-ESPert_MQTT::ESPert_MQTT()
-{
-  mqttClient = NULL;
-  mqttCallback = NULL;
-  mqttUser = "";
-  mqttPassword = "";
-}
 
-void ESPert_MQTT::init(IPAddress server, int port, String user, String password, SimplePubSubClient::callback_t cb) {
-  mqttUser = user;
-  mqttPassword = password;
-  mqttCallback = cb;
-
-  if (mqttClient) {
-    if (mqttClient->connected())
-    {
-      mqttClient->disconnect();
-    }
-
-    delete mqttClient;
-    mqttClient = NULL;
-  }
-
-  mqttClient = new SimplePubSubClient(server, port);
-}
-
-void ESPert_MQTT::init(IPAddress server, int port, SimplePubSubClient::callback_t cb) {
-  init(server, port, "", "", cb);
-}
-
-void ESPert_MQTT::init(String server, int port, String user, String password, SimplePubSubClient::callback_t cb) {
-  mqttUser = user;
-  mqttPassword = password;
-  mqttCallback = cb;
-
-  if (mqttClient) {
-    if (mqttClient->connected())
-    {
-      mqttClient->disconnect();
-    }
-
-    delete mqttClient;
-    mqttClient = NULL;
-  }
-
-  mqttClient = new SimplePubSubClient(server, port);
-}
-
-void ESPert_MQTT::init(String server, int port, SimplePubSubClient::callback_t cb) {
-  init(server, port, "", "", cb);
-}
-
-void ESPert_MQTT::setCallback(SimplePubSubClient::callback_t cb) {
-  mqttCallback = cb;
-}
-
-SimplePubSubClient *ESPert_MQTT::getSimplePubSubClient() {
-  return mqttClient;
-}
-
-String ESPert_MQTT::getClientName() {
-  String clientName = "";
-  uint8_t mac[6] = {0};
-
-  clientName += "ESPert-";
-  WiFi.macAddress(mac);
-  clientName += _espert->macToString(mac);
-  clientName += "-";
-  clientName += String(micros() & 0xff, 16);
-  return clientName;
-}
-
-void ESPert_MQTT::publish(String topic, String value) {
-  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
-    mqttClient->publish(topic, (char *) value.c_str());
-  }
-}
-
-void ESPert_MQTT::subscribe(String topic) {
-  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
-    mqttClient->subscribe(topic);
-  }
-}
-
-bool ESPert_MQTT::connect() {
-  bool reconnected = false;
-
-  if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
-    if (!mqttClient->connected()) {
-      String cn = getClientName();
-
-      if (mqttUser.length() > 0) {
-        reconnected = mqttClient->connect(MQTT::Connect((char *)cn.c_str()).set_auth(mqttUser, mqttPassword));
-      } else {
-        reconnected = mqttClient->connect((char *)cn.c_str());
-      }
-
-      if (reconnected) {
-        if (mqttCallback) {
-          mqttClient->set_callback(mqttCallback);
-        }
-      }
-    }
-
-    mqttClient->loop();
-  }
-
-  return reconnected;
-}
-*/
 
 // ****************************************
 // MQTT2 class
@@ -1140,7 +1002,7 @@ int ESPert_WiFi::init() {
         wifiMode = ESPERT_WIFI_MODE_CONNECT;
 
         _espert->println("ESPert: WiFi smart config connected, local IP " + _espert->wifi.getLocalIP());
-        WiFi.printDiag(Serial);
+        //WiFi.printDiag(Serial);
 
         _espert->button.resetPressTime();
       }
@@ -1148,7 +1010,7 @@ int ESPert_WiFi::init() {
       wifiMode = ESPERT_WIFI_MODE_CONNECT;
 
       _espert->println("ESPert: WiFi auto connected, local IP " + _espert->wifi.getLocalIP());
-      WiFi.printDiag(Serial);
+      //WiFi.printDiag(Serial);
 
       _espert->button.resetPressTime();
     }
@@ -1541,13 +1403,13 @@ void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int *progress) {
   if (_espert->oled.isReady()) {
     _espert->oled.setCursor(x, y);
     _espert->oled.setTextColor(ESPERT_BLACK);
-    _espert->oled.print("...", false);
+    _espert->oled.print("...");
     _espert->oled.setTextColor(ESPERT_WHITE);
     _espert->oled.setCursor(x, y);
 
     if (progress) {
       for (int i = 1; i <= *progress; i++) {
-        _espert->oled.print(".", false);
+        _espert->oled.print(".");
       }
 
       _espert->oled.update();

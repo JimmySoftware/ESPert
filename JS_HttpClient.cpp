@@ -11,7 +11,7 @@ int JS_HttpClient::skipResponseHeaders()
     isChunk = 0;
     header_line = "";
     
-    Serial.println( "You are at good place\n" );
+    //Serial.println( "You are at good place\n" );
     // Just keep reading until we finish reading the headers or time out
     unsigned long timeoutStart = millis();
     // Whilst we haven't timed out & haven't reached the end of the headers
