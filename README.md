@@ -18,9 +18,10 @@ Please proceed to follow the procedures as prescribed in the ESPresso Lite tutor
 
 # Install dependency for ESPert
 Open Library Manager (menu Sketch > Include Library > Manage Libraries…) then install the following libraries
-- Adafruit GFX library by Adafruit (current version 1.0.2)
 - DHT sensor library by Adafruit (current version 1.2.3)
 - ArduinoJson by Benoit Blanchon (current version 5.0.7)
+- HttpClient by Adrian McEwen (current version 2.2.0)
+- ESP8266 Oled Driver for SSD1306 display by Daniel Eichborn (current version 1.0.0)
 
 # Run examples from ESPert
 - Open Arduino IDE, try examples of ESPert library
