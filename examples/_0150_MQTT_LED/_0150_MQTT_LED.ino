@@ -31,6 +31,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
     } else if (value == "1") {
       espert.led.on();
       espert.println("LED: On");
+    } else if (value == "2") {
+      if( espert.led.isOn() ) {
+        espert.led.off();
+        espert.println("LED (Toglle): off");
+      }
+      else {
+        espert.led.on();
+        espert.println("LED (Toglle): On");
+      }
     }
 
     String outString  = "{\"status\":\"" + String(espert.led.isOn() ? 1 : 0) + "\", ";
