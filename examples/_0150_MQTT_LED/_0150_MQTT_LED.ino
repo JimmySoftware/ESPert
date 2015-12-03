@@ -2,8 +2,8 @@
 
 ESPert espert;
 
-IPAddress mqtt_server(192,168,77,1);
-//char* mqtt_server = "mqtt.espert.io";
+//IPAddress mqtt_server(192,168,77,1);
+const char* mqtt_server = "mqtt.espert.io";
 
 int currentSwitch = true;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/LED";

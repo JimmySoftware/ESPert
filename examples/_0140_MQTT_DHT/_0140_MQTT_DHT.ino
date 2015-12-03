@@ -1,14 +1,13 @@
 #include <ESPert.h>
 
-IPAddress mqtt_server(192,168,77,1);
-//char* mqtt_server = "mqtt.espert.io";
+//IPAddress mqtt_server(192,168,77,1);
+const char* mqtt_server = "mqtt.espert.io";
 
 ESPert espert;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/DHT";
 
 void setup() {
   espert.init();
-  espert.mqtt.init(mqtt_server, 1883);
   espert.dht.init();
 
   espert.oled.init();
@@ -25,6 +24,9 @@ void setup() {
     espert.oled.println("WiFi: connected.");
     espert.oled.print("IP..: ");
     espert.oled.println(espert.wifi.getLocalIP());
+    
+    espert.mqtt.init(mqtt_server, 1883);
+
   } else if (mode == ESPERT_WIFI_MODE_DISCONNECT) {
     espert.println(">>> WiFi mode: disconnected.");
     espert.oled.println("WiFi: not connected.");

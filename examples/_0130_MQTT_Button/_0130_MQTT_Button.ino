@@ -2,15 +2,14 @@
 
 ESPert espert;
 
-IPAddress mqtt_server(192,168,77,1);
-//char* mqtt_server = "mqtt.espert.io";
+//IPAddress mqtt_server(192,168,77,1);
+const char * mqtt_server = "mqtt.espert.io";
 
 int currentSwitch = true;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/Button";
 
 void setup() {
   espert.init(ESPERT_BOARD_ESPRESSO_LITE);
-  espert.mqtt.init(mqtt_server, 1883);
 
   espert.oled.init();
   delay(2000);
@@ -28,6 +27,8 @@ void setup() {
     espert.oled.println("WiFi: connected.");
     espert.oled.print("IP..: ");
     espert.oled.println(espert.wifi.getLocalIP());
+
+    espert.mqtt.init(mqtt_server, 1883);
   } else if (mode == ESPERT_WIFI_MODE_DISCONNECT) {
     espert.println(">>> WiFi mode: disconnected.");
     espert.oled.println("WiFi: not connected.");

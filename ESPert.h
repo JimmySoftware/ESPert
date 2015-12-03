@@ -262,8 +262,8 @@ class ESPert_MQTT2
     ESPert_MQTT2();
     void init(IPAddress server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
     void init(IPAddress server, int port, MQTT_CALLBACK_SIGNATURE);
-    void init(String server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
-    void init(String server, int port, MQTT_CALLBACK_SIGNATURE);
+    void init(const char * server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
+    void init(const char * server, int port, MQTT_CALLBACK_SIGNATURE);
     
     void setCallback(MQTT_CALLBACK_SIGNATURE = NULL);
     

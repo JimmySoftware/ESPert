@@ -51,6 +51,7 @@ void ESPert::loop() {
       wifi.setAutoConnect(true);
     }
   }
+  
   oled.update();
 }
 
@@ -833,7 +834,7 @@ void ESPert_MQTT2::init(IPAddress server, int port, MQTT_CALLBACK_SIGNATURE) {
   init(server, port, "", "", callback);
 }
 
-void ESPert_MQTT2::init(String server, int port, String user, String password, MQTT_CALLBACK_SIGNATURE) {
+void ESPert_MQTT2::init(const char * server, int port, String user, String password, MQTT_CALLBACK_SIGNATURE) {
   mqttUser = user;
   mqttPassword = password;
   setCallback(callback);
@@ -849,10 +850,11 @@ void ESPert_MQTT2::init(String server, int port, String user, String password, M
   }
 
   mqttClient = new PubSubClient(_client);
-  mqttClient->setServer(server.c_str(), 1883);
+  _espert->println( "Set Server to "+String(server) );
+  mqttClient->setServer(server, 1883);
 }
 
-void ESPert_MQTT2::init(String server, int port, MQTT_CALLBACK_SIGNATURE) {
+void ESPert_MQTT2::init(const char * server, int port, MQTT_CALLBACK_SIGNATURE) {
   init(server, port, "", "", callback);
 }
 
@@ -884,9 +886,9 @@ bool ESPert_MQTT2::connect() {
       String cn = getClientName();
 
       if (mqttUser.length() > 0) {
-        reconnected = mqttClient->connect((char *)cn.c_str(), mqttUser.c_str(), mqttPassword.c_str());
+        reconnected = mqttClient->connect((const char *)cn.c_str(), mqttUser.c_str(), mqttPassword.c_str());
       } else {
-        reconnected = mqttClient->connect((char *)cn.c_str());
+        reconnected = mqttClient->connect((const char *)cn.c_str());
       }
 
       if (reconnected) {
