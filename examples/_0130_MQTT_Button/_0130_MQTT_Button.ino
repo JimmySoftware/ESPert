@@ -1,6 +1,10 @@
 #include <ESPert.h>
 
 ESPert espert;
+
+IPAddress mqtt_server(192,168,77,1);
+//char* mqtt_server = "mqtt.tespa.io";
+
 int currentSwitch = true;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/Button";
 

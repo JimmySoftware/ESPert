@@ -2,6 +2,23 @@
 
 static ESPert *_espert = NULL;
 
+typedef enum {
+    eIdle,
+    eRequestStarted,
+    eRequestSent,
+    eReadingStatusCode,
+    eStatusCodeRead,
+    eReadingContentLength,
+    eSkipToEndOfHeader,
+    eLineStartingCRFound,
+    eReadingBody
+} tHttpState;
+
+// Number of milliseconds to wait without receiving any data before we give up
+const int kNetworkTimeout = 30*1000;
+// Number of milliseconds to wait if no data is available before trying again
+const int kNetworkDelay = 1000;
+
 ESPert::ESPert() {
   _espert = this;
 }
@@ -816,7 +833,7 @@ ESPert_MQTT::ESPert_MQTT()
   mqttPassword = "";
 }
 
-void ESPert_MQTT::init(IPAddress server, int port, String user, String password, PubSubClient::callback_t cb) {
+void ESPert_MQTT::init(IPAddress server, int port, String user, String password, SimplePubSubClient::callback_t cb) {
   mqttUser = user;
   mqttPassword = password;
   mqttCallback = cb;
@@ -831,14 +848,14 @@ void ESPert_MQTT::init(IPAddress server, int port, String user, String password,
     mqttClient = NULL;
   }
 
-  mqttClient = new PubSubClient(server, port);
+  mqttClient = new SimplePubSubClient(server, port);
 }
 
-void ESPert_MQTT::init(IPAddress server, int port, PubSubClient::callback_t cb) {
+void ESPert_MQTT::init(IPAddress server, int port, SimplePubSubClient::callback_t cb) {
   init(server, port, "", "", cb);
 }
 
-void ESPert_MQTT::init(String server, int port, String user, String password, PubSubClient::callback_t cb) {
+void ESPert_MQTT::init(String server, int port, String user, String password, SimplePubSubClient::callback_t cb) {
   mqttUser = user;
   mqttPassword = password;
   mqttCallback = cb;
@@ -853,18 +870,18 @@ void ESPert_MQTT::init(String server, int port, String user, String password, Pu
     mqttClient = NULL;
   }
 
-  mqttClient = new PubSubClient(server, port);
+  mqttClient = new SimplePubSubClient(server, port);
 }
 
-void ESPert_MQTT::init(String server, int port, PubSubClient::callback_t cb) {
+void ESPert_MQTT::init(String server, int port, SimplePubSubClient::callback_t cb) {
   init(server, port, "", "", cb);
 }
 
-void ESPert_MQTT::setCallback(PubSubClient::callback_t cb) {
+void ESPert_MQTT::setCallback(SimplePubSubClient::callback_t cb) {
   mqttCallback = cb;
 }
 
-PubSubClient *ESPert_MQTT::getPubSubClient() {
+SimplePubSubClient *ESPert_MQTT::getSimplePubSubClient() {
   return mqttClient;
 }
 
@@ -1426,6 +1443,127 @@ void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int *progress) {
 
     ESP.wdtFeed();
   }
+}
+
+String ESPert_WiFi::getHTTP( const char *_host, const char *_path )
+{
+  int err = 0;
+  int response_code = 0;  
+
+  _espert->print( "Connecting to " );
+  _espert->println( _host );
+
+  WiFiClient client;
+  _espert->print( "Requesting URL: " );
+  _espert->print( _host );
+  _espert->println( _path ); 
+
+  String response = "";
+
+  JS_HttpClient http(client);
+  err = http.get(_host, _path);
+  if (err == 0)
+  {
+      _espert->print("Got status code: ");
+      _espert->println(err);
+
+      // Usually you'd check that the response code is 200 or a
+      // similar "success" code (200-299) before carrying on,
+      // but we'll print out whatever response we get
+      response_code = http.responseStatusCode();
+      
+      _espert->print("Got response code: ");
+      _espert->println(response_code);
+      
+      err = http.skipResponseHeaders();
+      if (err >= 0)
+      {   
+        int bodyLen = http.contentLength();
+        _espert->print("Content length is: ");
+        _espert->println(bodyLen);
+        _espert->print("");
+        _espert->println("Body returned follows:");
+      
+        // Now we've got to the body, so we can print it out
+        unsigned long timeoutStart = millis();
+        char c;
+        int iChunkState = eReadingContentLength;
+        int iChunkLength = 0;
+        // Whilst we haven't timed out & haven't reached the end of the body
+        while ( (http.connected() || http.available()) &&
+               ((millis() - timeoutStart) < kNetworkTimeout) )
+        {
+            if (http.available())
+            {
+                c = http.read();
+                if( http.isChunk ) {
+                    switch(iChunkState)
+                    {
+                    case eReadingContentLength:
+                        if (isdigit(c))
+                        {
+                            iChunkLength = iChunkLength*16 + (c - '0');
+                        }
+                        else if( c >= 'a' && c <= 'f' )
+                        {
+                            iChunkLength = iChunkLength*16 + (c - 'a' + 10);
+                        }
+                        else if( c >= 'A' && c <= 'F' )
+                        {
+                            iChunkLength = iChunkLength*16 + (c - 'A' + 10);
+                        }
+                        else if( c == '\r' ) {
+                        }
+                        else
+                        {
+                            _espert->print( "Chunk length: " );
+                            _espert->println( iChunkLength );
+                            iChunkState = eReadingBody;
+                        }
+                        break;
+                    case eReadingBody:
+                        if( iChunkLength > 0 ) {
+                            response = response + c;
+                            iChunkLength--;
+                            if( iChunkLength == 0 )
+                                iChunkState = eReadingContentLength;
+                        }
+                        break;
+                    }
+                }
+                else {
+                    response = response + c;
+                }
+                // Print out this character
+                _espert->print(c);
+                bodyLen--;
+                // We read something, reset the timeout counter
+                timeoutStart = millis();
+            }
+            else
+            {
+                // We haven't got any data, so let's pause to allow some to
+                // arrive
+                delay(kNetworkDelay);
+            }
+        }
+      }
+      else
+      {
+        _espert->print("Failed to skip response headers: ");
+        _espert->println(err);
+      }        
+  }
+  else
+  {
+    _espert->print("Connect failed: ");
+    _espert->println(err);
+  }
+  _espert->print( "\r\nResponse:\r\n" );
+  _espert->print( response );
+ _espert->println( "---\r\n" );
+
+  return response;
 }
 
 // ****************************************

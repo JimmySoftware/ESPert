@@ -14,8 +14,9 @@
 #include <ESP_Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
 #include <DHT.h>
-#include <PubSubClient.H>
+#include <SimplePubSubClient.h>
 #include <ArduinoJson.h>
+#include <JS_HttpClient.h>
 
 static const float ESPERT_LIBRARY_VERSION = 0.8f;
 
@@ -244,23 +245,23 @@ class ESPert_OLED
 class ESPert_MQTT
 {
   private:
-    PubSubClient *mqttClient = NULL;
-    PubSubClient::callback_t mqttCallback;
+    SimplePubSubClient *mqttClient = NULL;
+    SimplePubSubClient::callback_t mqttCallback;
     String mqttUser;
     String mqttPassword;
 
   public:
     ESPert_MQTT();
-    void init(IPAddress server, int port, String user = "", String password = "", PubSubClient::callback_t cb = NULL);
-    void init(IPAddress server, int port, PubSubClient::callback_t cb);
-    void init(String server, int port, String user = "", String password = "", PubSubClient::callback_t cb = NULL);
-    void init(String server, int port, PubSubClient::callback_t cb);
-    void setCallback(PubSubClient::callback_t cb = NULL);
+    void init(IPAddress server, int port, String user = "", String password = "", SimplePubSubClient::callback_t cb = NULL);
+    void init(IPAddress server, int port, SimplePubSubClient::callback_t cb);
+    void init(String server, int port, String user = "", String password = "", SimplePubSubClient::callback_t cb = NULL);
+    void init(String server, int port, SimplePubSubClient::callback_t cb);
+    void setCallback(SimplePubSubClient::callback_t cb = NULL);
     String getClientName();
     void publish(String topic, String value);
     void subscribe(String topic);
     bool connect();
-    PubSubClient *getPubSubClient();
+    SimplePubSubClient *getSimplePubSubClient();
 };
 
 class ESPert_WiFi
@@ -281,6 +282,8 @@ class ESPert_WiFi
     void disconnect(bool reset = true);
     String getLocalIP();
     String getAPIP();
+    
+    String getHTTP( const char *host, const char *path );
 };
 
 class ESPert_GroveButton: public ESPert_Button

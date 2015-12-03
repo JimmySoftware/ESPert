@@ -44,7 +44,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define MQTTDISCONNECT  14 // Client is Disconnecting
 #define MQTTReserved    15 // Reserved
 
-class PubSubClient;
+class SimplePubSubClient;
 
 //! namespace for classes representing MQTT messages
 namespace MQTT {
@@ -114,7 +114,7 @@ namespace MQTT {
     //! Message type to expect in response to this message
     virtual uint8_t response_type(void) const { return 0; }
 
-    friend PubSubClient;	// Just to allow it to call response_type()
+    friend SimplePubSubClient;	// Just to allow it to call response_type()
 
   public:
     //! Send the message out

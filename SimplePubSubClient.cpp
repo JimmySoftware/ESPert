@@ -1,45 +1,45 @@
 /*
- PubSubClient.cpp - A simple client for MQTT.
+ SimplePubSubClient.cpp - A simple client for MQTT.
   Nicholas O'Leary
   http://knolleary.net
 */
 
-#include "PubSubClient.h"
+#include "SimplePubSubClient.h"
 #include <string.h>
 
-PubSubClient::PubSubClient() :
+SimplePubSubClient::SimplePubSubClient() :
   _callback(NULL),
   _max_retries(10)
 {}
 
-PubSubClient::PubSubClient(IPAddress &ip, uint16_t port) :
+SimplePubSubClient::SimplePubSubClient(IPAddress &ip, uint16_t port) :
   _callback(NULL),
   _max_retries(10),
   server_ip(ip),
   server_port(port)
 {}
 
-PubSubClient::PubSubClient(String hostname, uint16_t port) :
+SimplePubSubClient::SimplePubSubClient(String hostname, uint16_t port) :
   _callback(NULL),
   _max_retries(10),
   server_port(port),
   server_hostname(hostname)
 {}
 
-PubSubClient& PubSubClient::set_server(IPAddress &ip, uint16_t port) {
+SimplePubSubClient& SimplePubSubClient::set_server(IPAddress &ip, uint16_t port) {
   server_hostname = "";
   server_ip = ip;
   server_port = port;
   return *this;
 }
 
-PubSubClient& PubSubClient::set_server(String hostname, uint16_t port) {
+SimplePubSubClient& SimplePubSubClient::set_server(String hostname, uint16_t port) {
   server_hostname = hostname;
   server_port = port;
   return *this;
 }
 
-bool PubSubClient::_process_message(MQTT::Message* msg, uint8_t match_type, uint16_t match_pid) {
+bool SimplePubSubClient::_process_message(MQTT::Message* msg, uint8_t match_type, uint16_t match_pid) {
   lastInActivity = millis();
   if (msg->type() == match_type) {
     if (match_pid)
@@ -93,7 +93,7 @@ bool PubSubClient::_process_message(MQTT::Message* msg, uint8_t match_type, uint
   return false;
 }
 
-bool PubSubClient::wait_for(uint8_t match_type, uint16_t match_pid) {
+bool SimplePubSubClient::wait_for(uint8_t match_type, uint16_t match_pid) {
   while (!_client.available()) {
     if (millis() - lastInActivity > keepalive * 1000UL)
       return false;
@@ -116,7 +116,7 @@ bool PubSubClient::wait_for(uint8_t match_type, uint16_t match_pid) {
   return false;
 }
 
-bool PubSubClient::send_reliably(MQTT::Message* msg) {
+bool SimplePubSubClient::send_reliably(MQTT::Message* msg) {
   uint8_t retries = 0;
  send:
   msg->send(_client);
@@ -135,14 +135,14 @@ bool PubSubClient::send_reliably(MQTT::Message* msg) {
   return true;
 }
 
-bool PubSubClient::connect(String id) {
+bool SimplePubSubClient::connect(String id) {
   if (connected())
     return false;
 
   return connect(id, "", 0, false, "");
 }
 
-bool PubSubClient::connect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage) {
+bool SimplePubSubClient::connect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage) {
   if (connected())
     return false;
 
@@ -152,7 +152,7 @@ bool PubSubClient::connect(String id, String willTopic, uint8_t willQos, bool wi
   return connect(conn);
 }
 
-bool PubSubClient::connect(MQTT::Connect &conn) {
+bool SimplePubSubClient::connect(MQTT::Connect &conn) {
   if (connected())
     return false;
 
@@ -180,7 +180,7 @@ bool PubSubClient::connect(MQTT::Connect &conn) {
   return ret;
 }
 
-bool PubSubClient::loop() {
+bool SimplePubSubClient::loop() {
   if (!connected())
     return false;
 
@@ -207,7 +207,7 @@ bool PubSubClient::loop() {
   return true;
 }
 
-bool PubSubClient::publish(String topic, String payload) {
+bool SimplePubSubClient::publish(String topic, String payload) {
   if (!connected())
     return false;
 
@@ -215,7 +215,7 @@ bool PubSubClient::publish(String topic, String payload) {
   return publish(pub);
 }
 
-bool PubSubClient::publish(String topic, const uint8_t* payload, uint32_t plength, bool retained) {
+bool SimplePubSubClient::publish(String topic, const uint8_t* payload, uint32_t plength, bool retained) {
   if (!connected())
     return false;
 
@@ -224,7 +224,7 @@ bool PubSubClient::publish(String topic, const uint8_t* payload, uint32_t plengt
   return publish(pub);
 }
 
-bool PubSubClient::publish_P(String topic, PGM_P payload, uint32_t plength, bool retained) {
+bool SimplePubSubClient::publish_P(String topic, PGM_P payload, uint32_t plength, bool retained) {
   if (!connected())
     return false;
 
@@ -233,7 +233,7 @@ bool PubSubClient::publish_P(String topic, PGM_P payload, uint32_t plength, bool
   return publish(pub);
 }
 
-bool PubSubClient::publish(MQTT::Publish &pub) {
+bool SimplePubSubClient::publish(MQTT::Publish &pub) {
   if (!connected())
     return false;
 
@@ -262,7 +262,7 @@ bool PubSubClient::publish(MQTT::Publish &pub) {
   return true;
 }
 
-bool PubSubClient::subscribe(String topic, uint8_t qos) {
+bool SimplePubSubClient::subscribe(String topic, uint8_t qos) {
   if (!connected())
     return false;
 
@@ -273,7 +273,7 @@ bool PubSubClient::subscribe(String topic, uint8_t qos) {
   return subscribe(sub);
 }
 
-bool PubSubClient::subscribe(MQTT::Subscribe &sub) {
+bool SimplePubSubClient::subscribe(MQTT::Subscribe &sub) {
   if (!connected())
     return false;
 
@@ -283,7 +283,7 @@ bool PubSubClient::subscribe(MQTT::Subscribe &sub) {
   return true;
 }
 
-bool PubSubClient::unsubscribe(String topic) {
+bool SimplePubSubClient::unsubscribe(String topic) {
   if (!connected())
     return false;
 
@@ -291,7 +291,7 @@ bool PubSubClient::unsubscribe(String topic) {
   return unsubscribe(unsub);
 }
 
-bool PubSubClient::unsubscribe(MQTT::Unsubscribe &unsub) {
+bool SimplePubSubClient::unsubscribe(MQTT::Unsubscribe &unsub) {
   if (!connected())
     return false;
 
@@ -301,14 +301,14 @@ bool PubSubClient::unsubscribe(MQTT::Unsubscribe &unsub) {
   return true;
 }
 
-void PubSubClient::disconnect() {
+void SimplePubSubClient::disconnect() {
    MQTT::Disconnect discon;
    discon.send(_client);
    _client.stop();
    lastInActivity = lastOutActivity = millis();
 }
 
-bool PubSubClient::connected() {
+bool SimplePubSubClient::connected() {
    bool rc = _client.connected();
    if (!rc)
      _client.stop();

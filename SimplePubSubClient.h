@@ -16,7 +16,7 @@
 #include "MQTT.h"
 
 //! Main do-everything class that sketches will use
-class PubSubClient {
+class SimplePubSubClient {
 public:
 #ifdef _GLIBCXX_FUNCTIONAL
   typedef std::function<void(const MQTT::Publish&)> callback_t;
@@ -48,27 +48,27 @@ private:
 
 public:
    //! Empty constructor - use set_server() later, before connect()
-   PubSubClient();
+   SimplePubSubClient();
 
    //! Constructor with the server ip address
-   PubSubClient(IPAddress &ip, uint16_t port = 1883);
+   SimplePubSubClient(IPAddress &ip, uint16_t port = 1883);
    //! Constructors with the host name
-   PubSubClient(String hostname, uint16_t port = 1883);
+   SimplePubSubClient(String hostname, uint16_t port = 1883);
 
    //! Set the server ip address
-   PubSubClient& set_server(IPAddress &ip, uint16_t port = 1883);
+   SimplePubSubClient& set_server(IPAddress &ip, uint16_t port = 1883);
    //! Set the server host name
-   PubSubClient& set_server(String hostname, uint16_t port = 1883);
+   SimplePubSubClient& set_server(String hostname, uint16_t port = 1883);
 
    //! Get the callback function
    callback_t callback(void) const { return _callback; }
    //! Set the callback function
-   PubSubClient& set_callback(callback_t cb) { _callback = cb; return *this; }
+   SimplePubSubClient& set_callback(callback_t cb) { _callback = cb; return *this; }
    //! Unset the callback function
-   PubSubClient& unset_callback(void) { _callback = NULL; return * this; }
+   SimplePubSubClient& unset_callback(void) { _callback = NULL; return * this; }
 
    //! Set the maximum number of retries when waiting for response packets
-   PubSubClient& set_max_retries(uint8_t mr) { _max_retries = mr; return *this; }
+   SimplePubSubClient& set_max_retries(uint8_t mr) { _max_retries = mr; return *this; }
 
    //! Connect to the server with a client id
    /*!
