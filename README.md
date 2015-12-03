@@ -22,6 +22,7 @@ Open Library Manager (menu Sketch > Include Library > Manage Libraries…) then 
 - ArduinoJson by Benoit Blanchon (current version 5.0.7)
 - HttpClient by Adrian McEwen (current version 2.2.0)
 - ESP8266 Oled Driver for SSD1306 display by Daniel Eichborn (current version 1.0.0)
+- PubSubClient by Nick O'Leary (current version 2.4.0)
 
 # Run examples from ESPert
 - Open Arduino IDE, try examples of ESPert library
