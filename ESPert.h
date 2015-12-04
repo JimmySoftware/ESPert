@@ -330,6 +330,19 @@ class ESPert_Grove
     ESPert_GroveRelay     relay;
 };
 
+class ESPert_Buzzer
+{
+  private:
+    int pin;
+
+  public:
+    void init(int pin = -1);
+    void beep( int freeq, int duration );
+    void on( int freq );
+    void off();
+};
+
+
 class ESPert : public Print
 {
   public:
@@ -345,6 +358,7 @@ class ESPert : public Print
     ESPert_MQTT2          mqtt;
     ESPert_SoftwareSerial swSerial;
     ESPert_WiFi           wifi;
+    ESPert_Buzzer         buzzer;
 
     ESPert();
     void init(int type = ESPERT_BOARD_ESPRESSO_LITE);

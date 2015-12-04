@@ -1598,3 +1598,27 @@ void ESPert_GroveRelay::set(bool state) {
 int ESPert_GroveRelay::get() {
   return !ESPert_LED::get();
 }
+
+void ESPert_Buzzer::init(int pin )
+{
+    this->pin = pin;
+}
+
+void ESPert_Buzzer::beep( int freeq, int duration )
+{
+  analogWrite(pin, freeq);      // Almost any value can be used except 0 and 255
+                           // experiment to get the best tone
+  delay(duration);          // wait for a delayms ms
+  analogWrite(pin, 0);       // 0 turns it off
+}
+
+void ESPert_Buzzer::on( int freeq )
+{
+  analogWrite(pin, freeq);      // Almost any value can be used except 0 and 255
+                           // experiment to get the best tone
+}
+
+void ESPert_Buzzer::off( )
+{
+  analogWrite(pin, 0);       // 0 turns it off
+}
