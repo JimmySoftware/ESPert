@@ -75,7 +75,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
     String value = espert.json.get("IFTTT");
     ifttt_key = value;
-    espert.eeprom.write( 200, `ifttt_key );
+    espert.eeprom.write( 200, ifttt_key );
   }
 }
 
