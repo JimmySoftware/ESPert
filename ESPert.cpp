@@ -940,11 +940,7 @@ int ESPert_WiFi::init() {
     bAutoConfig = false;
   } else if (str == "ESPert:AutoConnect") {
     bAutoConfig = true;
-  }
-
-  if (bAutoConfig) {
-    if (!test()) {
-      if (!smartConfig()) {
+  } else if (str == "ESPert:ConfigAP") {
         wifiMode = ESPERT_WIFI_MODE_SETTINGAP;
 
         _espert->led.on();
@@ -1000,6 +996,17 @@ int ESPert_WiFi::init() {
         }
 
         _espert->button.resetPressTime();
+  }
+
+  if (bAutoConfig) {
+    if (!test()) {
+      if (!smartConfig()) {
+        _espert->eeprom.write(237, "ESPert:ConfigAP");
+        _espert->println("ESPert: WiFi AP on restart!");
+
+        delay(100);
+        ESP.reset();
+
       } else {
         wifiMode = ESPERT_WIFI_MODE_CONNECT;
 
@@ -1043,6 +1050,7 @@ bool ESPert_WiFi::smartConfig() {
   while (1) {
     if (_espert->button.isOn()) {
       if (_espert->button.isLongPress()) {
+        
         _espert->button.resetPressTime();
         drawProgress(x, y, NULL);
         _espert->oled.setCursor(x, y);
@@ -1050,6 +1058,8 @@ bool ESPert_WiFi::smartConfig() {
         WiFi.stopSmartConfig();
         _espert->led.off();
         return false;
+        
+
       }
     }
 
@@ -1155,8 +1165,10 @@ void ESPert_WiFi::initSetupAP(void) {
       ESP.wdtFeed();
     }
   }
-
+  
+  WiFi.disconnect();
   delay(100);
+  _espert->println( "AP: " + _espert->info.getId() );
   WiFi.softAP(_espert->info.getId().c_str());
 
   _espert->println();
@@ -1300,11 +1312,15 @@ void ESPert_WiFi::initSetupServer() {
       WiFi.begin(ESPertSSID.c_str(), ESPertPassword.c_str());
       int c = 0;
       _espert->println("ESPert: Waiting for WiFi to connect!");
+      _espert->oled.clear();
+      _espert->oled.println( "Connecting..." );
 
       while (c < 15) {
         if (WiFi.status() == WL_CONNECTED) {
           _espert->println();
-          _espert->println("ESPert: WiFi connected, local IP " + _espert->wifi.getLocalIP());
+          _espert->println("ESPert: WiFi connected OK, local IP " + _espert->wifi.getLocalIP());
+          _espert->eeprom.write(237, "ESPert:");
+          delay( 100 );
           break;
         }
 
