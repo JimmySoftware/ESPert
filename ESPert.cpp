@@ -48,7 +48,11 @@ void ESPert::loop() {
     if (mode == ESPERT_WIFI_MODE_CONNECT) {
       wifi.setAutoConnect(false);
     } else if (mode == ESPERT_WIFI_MODE_DISCONNECT) {
-      wifi.setAutoConnect(true);
+      _espert->eeprom.write(237, "ESPert:SmartConfig");
+      _espert->println("ESPert: WiFi SmartConfig on restart!");
+
+      delay(100);
+      ESP.reset();
     }
   }
   
@@ -940,6 +944,24 @@ int ESPert_WiFi::init() {
     bAutoConfig = false;
   } else if (str == "ESPert:AutoConnect") {
     bAutoConfig = true;
+  } else if ( str == "ESPert:SmartConfig" ) {
+    if (!smartConfig()) {
+      _espert->eeprom.write(237, "ESPert:ConfigAP");
+      _espert->println("ESPert: WiFi AP on restart!");
+
+      delay(100);
+      ESP.reset();
+
+    } else {
+      wifiMode = ESPERT_WIFI_MODE_CONNECT;
+
+      _espert->println("ESPert: WiFi smart config connected, local IP " + _espert->wifi.getLocalIP());
+        //WiFi.printDiag(Serial);
+
+      _espert->button.resetPressTime();
+      return wifiMode;
+    }
+
   } else if (str == "ESPert:ConfigAP") {
         wifiMode = ESPERT_WIFI_MODE_SETTINGAP;
 
@@ -962,7 +984,7 @@ int ESPert_WiFi::init() {
 
         _espert->oled.print("IP..: ");
         _espert->oled.println(getAPIP());
-        _espert->oled.print("WiFi: Setting AP");
+        _espert->oled.print("WiFi: AP Mode");
 
         int progress = 0;
         int16_t x = _espert->oled.getCursorX();
@@ -1000,21 +1022,12 @@ int ESPert_WiFi::init() {
 
   if (bAutoConfig) {
     if (!test()) {
-      if (!smartConfig()) {
-        _espert->eeprom.write(237, "ESPert:ConfigAP");
-        _espert->println("ESPert: WiFi AP on restart!");
+      _espert->println( "Test failed." );
+      _espert->eeprom.write(237, "ESPert:SmartConfig");
+      _espert->println("ESPert: WiFi SmartConfig on restart!");
 
-        delay(100);
-        ESP.reset();
-
-      } else {
-        wifiMode = ESPERT_WIFI_MODE_CONNECT;
-
-        _espert->println("ESPert: WiFi smart config connected, local IP " + _espert->wifi.getLocalIP());
-        //WiFi.printDiag(Serial);
-
-        _espert->button.resetPressTime();
-      }
+      delay(100);
+      ESP.reset();
     } else {
       wifiMode = ESPERT_WIFI_MODE_CONNECT;
 
@@ -1039,13 +1052,17 @@ int ESPert_WiFi::getMode() {
 bool ESPert_WiFi::smartConfig() {
   _espert->led.on();
   wifiMode = ESPERT_WIFI_MODE_SMARTCONFIG;
+  
+  int16_t x = _espert->oled.getCursorX();
+  int16_t y = _espert->oled.getCursorY();
+
   _espert->oled.print("WiFi: Smart Config");
 
   WiFi.beginSmartConfig();
 
   int progress = 0;
-  int16_t x = _espert->oled.getCursorX();
-  int16_t y = _espert->oled.getCursorY();
+  x = _espert->oled.getCursorX();
+  y = _espert->oled.getCursorY();
 
   while (1) {
     if (_espert->button.isOn()) {
@@ -1186,13 +1203,18 @@ void ESPert_WiFi::initSetupAP(void) {
 bool ESPert_WiFi::test(int timeOut) {
   int c = 0;
   _espert->println("ESPert: Waiting for WiFi to connect!");
+  _espert->oled.println( "Connecting..." );
 
+  int progress = 0;
+  int16_t x = _espert->oled.getCursorX();
+  int16_t y = _espert->oled.getCursorY();
   while (timeOut == -1 || (timeOut != -1 && c < timeOut)) {
     if (WiFi.status() == WL_CONNECTED) {
       _espert->println();
       _espert->println("ESPert: Connected!");
       return true;
     }
+    drawProgress(x, y, &progress);
 
     delay(1000);
     int n = WiFi.status();
@@ -1200,6 +1222,7 @@ bool ESPert_WiFi::test(int timeOut) {
     if (n == 0) {
       _espert->println("ESPert: No ESP auto connect info!");
       _espert->led.off();
+      _espert->oled.println( "No auto connect info" );
       return false;
     }
 
