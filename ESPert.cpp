@@ -24,6 +24,29 @@ ESPert::ESPert() {
   _espert = this;
 }
 
+bool ESPert::checkFlashSize() {
+    uint32_t realSize = ESP.getFlashChipRealSize();
+    uint32_t ideSize = ESP.getFlashChipSize();
+    FlashMode_t ideMode = ESP.getFlashChipMode();
+
+    Serial.printf("Flash real id:   %08X\n", ESP.getFlashChipId());
+    Serial.printf("Flash real size: %u\n\n", realSize);
+
+    Serial.printf("Flash ide  size: %u\n", ideSize);
+    Serial.printf("Flash ide speed: %u\n", ESP.getFlashChipSpeed());
+    Serial.printf("Flash ide mode:  %s\n", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"));
+
+    if(ideSize != realSize) {
+        Serial.println("************ ERROR ************" );
+        Serial.println("Flash Chip configuration wrong!");
+        Serial.println("*******************************\n" );
+        return false;
+    } else {
+        Serial.println("Flash Chip configuration ok.\n");
+        return true;
+    }
+}
+
 void ESPert::init(int type) {
   ESPertBoardType = type;
 
@@ -35,8 +58,12 @@ void ESPert::init(int type) {
 
   led.init();
   button.init();
+  
+
 
   delay(1500);
+  
+  checkFlashSize();
 }
 
 void ESPert::loop() {

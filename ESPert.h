@@ -15,7 +15,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <JS_HttpClient.h>
-#include <ssd1306_i2c.h>
+#include <SSD1306.h>
 
 static const float ESPERT_LIBRARY_VERSION = 0.8f;
 
@@ -120,6 +120,7 @@ class ESPert_BLE
     int getMajor();
     int getMinor();
     int getTXPower();
+
 };
 
 class ESPert_Button
@@ -364,6 +365,7 @@ class ESPert : public Print
     void init(int type = ESPERT_BOARD_ESPRESSO_LITE);
     void loop();
     String macToString(const uint8_t* mac);
+    bool checkFlashSize();
 
 #if ARDUINO >= 100
     virtual size_t write(uint8_t);
