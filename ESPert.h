@@ -16,6 +16,7 @@
 #include <ArduinoJson.h>
 #include <JS_HttpClient.h>
 #include <SSD1306.h>
+#include <Adafruit_NeoPixel.h>
 
 static const float ESPERT_LIBRARY_VERSION = 0.8f;
 
@@ -343,6 +344,38 @@ class ESPert_Buzzer
     void off();
 };
 
+#define ColorRed     0xFF0000
+#define ColorGreen   0x008000
+#define ColorBlue    0x0000FF
+#define ColorCyan    0x00FFFF
+#define ColorPurple  0x800080
+#define ColorGray    0x808080
+#define ColorBrown   0xA52A2A
+#define ColorSilver  0xC0C0C0
+#define ColorViolet  0xEE82EE
+#define ColorPink    0xFFC0CB
+#define ColorGold    0xFFD700
+#define ColorYellow  0xFFFF00
+#define ColorWhite   0xFFFFFF
+
+class ESPERT_NeoPixel // WS2812
+{
+	private:
+        Adafruit_NeoPixel *_neopixel;
+	public:
+		void init(uint8_t p = 14, uint8_t n = 8);
+    	void setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b);
+    	void setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b, uint8_t w);
+    	void setPixelColor(uint16_t n, uint32_t c);
+    	void setColor(uint8_t r, uint8_t g, uint8_t b);
+    	void setColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w);
+    	void setColor(uint32_t c);
+    	void clear();
+        void off();
+    	void show();
+    	void rainbow();
+        uint32_t Wheel(byte WheelPos);
+};
 
 class ESPert : public Print
 {
@@ -360,6 +393,7 @@ class ESPert : public Print
     ESPert_SoftwareSerial swSerial;
     ESPert_WiFi           wifi;
     ESPert_Buzzer         buzzer;
+    ESPERT_NeoPixel  	  neopixel;
 
     ESPert();
     void init(int type = ESPERT_BOARD_ESPRESSO_LITE);
