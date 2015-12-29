@@ -8,8 +8,8 @@ Please proceed to follow the procedures as prescribed in the ESPresso Lite tutor
 
 ## ESP8266 Board Manager (Staging Version)
 - Start Arduino and open Preference
-- Enter the URL http://arduino.esp8266.com/staging/package_esp8266com_index.json into Additional Board Manager URLs field. If you have multiple URLs, separating them with commas.
-- Open Boards Manager from Tools > Board > Board Manager then install esp8266 by ESP8266 Community (current version is 2.0.0-rc2)
+- Enter the URL http://arduino.esp8266.com/stable/package_esp8266com_index.json into Additional Board Manager URLs field. If you have multiple URLs, separating them with commas.
+- Open Boards Manager from Tools > Board > Board Manager then install esp8266 by ESP8266 Community (current version is 2.0.0)
 - From menu Tools > Board select Generic ESP8266 Module
 
 ## ESPert library
