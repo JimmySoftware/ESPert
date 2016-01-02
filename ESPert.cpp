@@ -1688,3 +1688,99 @@ void ESPert_Buzzer::off( )
 {
   analogWrite(pin, 0);       // 0 turns it off
 }
+
+// *************************************************
+// NeoPixel Class
+// *************************************************
+void ESPERT_NeoPixel::init(uint8_t p, uint8_t n)
+{
+    if (!_neopixel)
+    {
+        this->_neopixel = new Adafruit_NeoPixel(n , p , NEO_GRB + NEO_KHZ800);
+    }
+    this->_neopixel->begin();
+    this->_neopixel->show();
+}
+
+void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b)
+{
+    this->_neopixel->setPixelColor(n,r,g,b);
+}
+
+void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b, uint8_t w)
+{
+    this->_neopixel->setPixelColor(n,r,g,b,w);
+}
+
+void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint32_t c)
+{
+    this->_neopixel->setPixelColor(n,c);
+}
+
+void ESPERT_NeoPixel::show()
+{
+    this->_neopixel->show();
+}
+
+void ESPERT_NeoPixel::clear()
+{
+    this->_neopixel->clear();
+}
+
+void ESPERT_NeoPixel::off()
+{
+    this->_neopixel->clear();
+    this->_neopixel->show();
+}
+
+void ESPERT_NeoPixel::setColor(uint8_t r, uint8_t g, uint8_t b)
+{
+    for (uint8_t i=0;i < this->_neopixel->numPixels() ; i++)
+    {
+        this->_neopixel->setPixelColor(i,r,g,b);
+    }
+    this->_neopixel->show();
+}
+
+void ESPERT_NeoPixel::setColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w)
+{
+    for (uint8_t i=0;i < this->_neopixel->numPixels() ; i++)
+    {
+        this->_neopixel->setPixelColor(i,r,g,b,w);
+    }
+}
+
+void ESPERT_NeoPixel::setColor(uint32_t c)
+{
+    for (uint8_t i=0;i < this->_neopixel->numPixels() ; i++)
+    {
+        this->_neopixel->setPixelColor(i,c);
+    }
+    this->_neopixel->show();
+}
+
+void ESPERT_NeoPixel::rainbow()
+{
+    for(uint8_t i=0; i< this->_neopixel->numPixels(); i++)
+    {
+        //strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+        this->_neopixel->setPixelColor(i, Wheel(((i * 256 / this->_neopixel->numPixels())) & 255));
+    }
+    this->_neopixel->show();
+}
+
+uint32_t ESPERT_NeoPixel::Wheel(byte WheelPos) 
+{
+    WheelPos = 255 - WheelPos;
+    if(WheelPos < 85) {
+        return this->_neopixel->Color(255 - WheelPos * 3, 0, WheelPos * 3);
+    }
+    if(WheelPos < 170) {
+    WheelPos -= 85;
+        return this->_neopixel->Color(0, WheelPos * 3, 255 - WheelPos * 3);
+    }
+
+    WheelPos -= 170;
+    return this->_neopixel->Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
