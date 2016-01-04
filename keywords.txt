@@ -22,6 +22,8 @@ wifi		KEYWORD1	wifi
 buzzer		KEYWORD1	buzzer
 neopixel	KEYWORD1	neopixel
 
+
+
 #######################################
 # Methods and Functions (KEYWORD2)
 #######################################
@@ -31,6 +33,8 @@ init						KEYWORD2
 off							KEYWORD2
 on							KEYWORD2
 isOn						KEYWORD2
+
+#ESPert_Info
 getId						KEYWORD2
 getLibraryVersion			KEYWORD2
 getFreeHeap					KEYWORD2
@@ -41,6 +45,24 @@ getFlashChipRealSize		KEYWORD2
 getFlashChipSize			KEYWORD2
 getFlashChipSpeed			KEYWORD2
 getFlashChipSizeByChipId	KEYWORD2
+
+#ESPert_WiFi
+init						KEYWORD2
+getMode						KEYWORD2
+setAutoConnect				KEYWORD2
+smartConfig					KEYWORD2
+initSetupAP					KEYWORD2
+initSetupServer				KEYWORD2
+test						KEYWORD2
+disconnect					KEYWORD2
+getLocalIP					KEYWORD2
+getAPIP						KEYWORD2
+getHTTP						KEYWORD2
+
+#DHT
+isReady						KEYWORD2
+getHumidity					KEYWORD2
+getTemperature				KEYWORD2
 
 
 
