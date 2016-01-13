@@ -75,7 +75,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
     String value = espert.json.get("IFTTT");
     ifttt_key = value;
-    espert.eeprom.write( 200, ifttt_key );
+    espert.eeprom.write( 150, ifttt_key );
   }
 }
 
@@ -86,7 +86,7 @@ void setup() {
   espert.dht.init();
   espert.mqtt.init(mqtt_server, 1883, callback);
 
-  ifttt_key = espert.eeprom.read( 200, 32 );
+  ifttt_key = espert.eeprom.read( 150, 80 );
 
   button2.init( 0 );
 
