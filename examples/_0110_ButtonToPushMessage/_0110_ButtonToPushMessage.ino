@@ -6,7 +6,7 @@ const char *host = "www.espert.io";
 const int httpPort = 80;
 
 String message = "Hello from ESPresso Lite!";
-String smartphone_key = "5733311175458816";
+String smartphone_key = "5695159920492544";
 
 bool currentSwitch = true;
 

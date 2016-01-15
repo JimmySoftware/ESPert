@@ -76,6 +76,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
     String value = espert.json.get("IFTTT");
     ifttt_key = value;
     espert.eeprom.write( 150, ifttt_key );
+
+    String outString  = "{\"IFTTT\":\"" + ifttt_key + "\", ";
+    outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
+    espert.println("Send...: " + outString);
+    espert.mqtt.publish(outTopic, outString);
+
   }
 }
 
