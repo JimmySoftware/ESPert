@@ -99,7 +99,7 @@ void setup() {
   espert.oled.init();
   delay(2000);
 
-  espert.println("Press USER button to turn on LED.");
+  espert.println("Press USER button to switch Mode");
 
   espert.oled.clear();
   espert.oled.println(espert.info.getId());
