@@ -5,15 +5,15 @@ bool currentSwitch = true;
 
 void setup() {
   espert.init();
-  espert.println("Press USER button to turn on LED.");
-  espert.buzzer.init( 15 );
-  delay( 200 );
-  espert.buzzer.beep( 60, 200 );
-  delay( 200 );
-  espert.buzzer.beep( 60, 200 );
-  delay( 200 );
-  espert.buzzer.beep( 60, 200 );
-  delay( 200 );
+  espert.println("Press USER button to turn on LED and buzzer.");
+  espert.buzzer.init(15);
+  delay(200);
+  espert.buzzer.beep(60, 200);
+  delay(200);
+  espert.buzzer.beep(60, 200);
+  delay(200);
+  espert.buzzer.beep(60, 200);
+  delay(200);
 }
 
 void loop() {
@@ -23,7 +23,7 @@ void loop() {
     if (buttonPressed) {
       espert.println("Button: On");
       espert.led.on();
-      espert.buzzer.on( 60 );
+      espert.buzzer.on(60);
     } else {
       espert.println("Button: Off");
       espert.led.off();

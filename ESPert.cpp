@@ -1,56 +1,46 @@
 #include "ESPert.h"
-#include "logo.h"
 
-static ESPert *_espert = NULL;
-
-typedef enum {
-    eIdle,
-    eRequestStarted,
-    eRequestSent,
-    eReadingStatusCode,
-    eStatusCodeRead,
-    eReadingContentLength,
-    eSkipToEndOfHeader,
-    eLineStartingCRFound,
-    eReadingBody
-} tHttpState;
-
-// Number of milliseconds to wait without receiving any data before we give up
-const int kNetworkTimeout = 30*1000;
-// Number of milliseconds to wait if no data is available before trying again
-const int kNetworkDelay = 1000;
+static ESPert* _espert = NULL;
 
 ESPert::ESPert() {
   _espert = this;
 }
 
 bool ESPert::checkFlashSize() {
-    uint32_t realSize = ESP.getFlashChipRealSize();
-    uint32_t ideSize = ESP.getFlashChipSize();
-    FlashMode_t ideMode = ESP.getFlashChipMode();
+  uint32_t realSize = ESP.getFlashChipRealSize();
+  uint32_t ideSize = ESP.getFlashChipSize();
+  FlashMode_t ideMode = ESP.getFlashChipMode();
 
-    Serial.printf("Flash real id:   %08X\n", ESP.getFlashChipId());
-    Serial.printf("Flash real size: %u\n\n", realSize);
+  Serial.println();
+  Serial.printf("Flash real id....: %08X\n", ESP.getFlashChipId());
+  Serial.printf("Flash real size..: %u\n\n", realSize);
 
-    Serial.printf("Flash ide  size: %u\n", ideSize);
-    Serial.printf("Flash ide speed: %u\n", ESP.getFlashChipSpeed());
-    Serial.printf("Flash ide mode:  %s\n", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"));
+  Serial.printf("Flash ide size...: %u\n", ideSize);
+  Serial.printf("Flash ide speed..: %u\n", ESP.getFlashChipSpeed());
+  Serial.printf("Flash ide mode...: %s\n", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"));
 
-    if(ideSize != realSize) {
-        Serial.println("************ ERROR ************" );
-        Serial.println("Flash Chip configuration wrong!");
-        Serial.println("*******************************\n" );
-        return false;
-    } else {
-        Serial.println("Flash Chip configuration ok.\n");
-        return true;
-    }
+  if (ideSize != realSize) {
+    Serial.println("************ ERROR ************");
+    Serial.println("Flash Chip configuration wrong!");
+    Serial.println("*******************************\n");
+    return false;
+  } else {
+    Serial.println("Flash Chip configuration ok.\n");
+    return true;
+  }
 }
 
-void ESPert::init(int type) {
-  ESPertBoardType = type;
+void ESPert::init(int type, long baud) {
+  if (type != -1) {
+    ESPertBoardType = type;
+  }
 
-  Serial.begin(115200);
+  if (ESPertBoardType == ESPERT_BOARD_ESPRESSO_LITE2) {
+    ESPERT_PIN_LED = 2;
+    ESPERT_PIN_BUTTON = 13;
+  }
+
+  Serial.begin(baud);
   EEPROM.begin(512);
 
   wdt_disable();
@@ -58,11 +48,9 @@ void ESPert::init(int type) {
 
   led.init();
   button.init();
-  
-
 
   delay(1500);
-  
+
   checkFlashSize();
 }
 
@@ -82,7 +70,7 @@ void ESPert::loop() {
       ESP.reset();
     }
   }
-  
+
   oled.update();
 }
 
@@ -241,7 +229,7 @@ ESPert_BLE::ESPert_BLE() {
   swSerial = NULL;
 }
 
-bool ESPert_BLE::init(ESPert_SoftwareSerial *swSer) {
+bool ESPert_BLE::init(ESPert_SoftwareSerial* swSer) {
   swSerial = swSer;
 
   if (swSerial) {
@@ -519,7 +507,7 @@ bool ESPert_Button::get() {
 // DHT class
 // ****************************************
 ESPert_DHT::ESPert_DHT() {
-  DHT *dht = NULL;
+  DHT* dht = NULL;
   dhtPin = ESPERT_PIN_DHT;
   dhtType = ESPERT_DHT_TYPE;
 }
@@ -563,7 +551,7 @@ float ESPert_DHT::getHumidity() {
 
 float ESPert_DHT::getTemperature(bool isFarenheit) {
   float temperature = NAN;
-  int retry = 3;
+  int retry = 8;
 
   while (dht && retry) {
     temperature = dht->readTemperature(isFarenheit);
@@ -580,9 +568,9 @@ float ESPert_DHT::getTemperature(bool isFarenheit) {
   return temperature;
 }
 
-// *************************************************
+// ****************************************
 // EEPROM class
-// *************************************************
+// ****************************************
 String ESPert_EEPROM::read(int index, int length) {
   String text = "";
   char ch = 1;
@@ -607,9 +595,9 @@ int ESPert_EEPROM::write(int index, String text) {
   return text.length() + 1;
 }
 
-// *************************************************
+// ****************************************
 // JSON class
-// *************************************************
+// ****************************************
 ESPert_JSON::ESPert_JSON() {
   json = NULL;
   root = NULL;
@@ -710,7 +698,7 @@ void ESPert_OLED::init() {
     display = new SSD1306(0x3c, ESPERT_PIN_SDA, ESPERT_PIN_SCL);
 
 #if (SSD1306_LCDHEIGHT != 64)
-//#error("Height incorrect, please fix Adafruit_SSD1306.h!");
+    //#error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
     if (display) {
@@ -720,8 +708,8 @@ void ESPert_OLED::init() {
       display->flipScreenVertically();
 
       display->clear();
-      drawBitmap(0, 0, logo, 128, 64, ESPERT_WHITE, true );
-      delay( 1000 );
+      drawBitmap(0, 0, logo, 128, 64, ESPERT_WHITE, true);
+      delay(1000);
       // init done
 
       // Show image buffer on the display hardware.
@@ -749,29 +737,29 @@ size_t ESPert_OLED::write(uint8_t c)
 void ESPert_OLED::write(uint8_t c)
 #endif
 {
-    char t[2];
-    t[0] = c;
-    t[1] = 0;
-    
-    if( c == 13 ) {
-        update();
-        cursorX = 0;
-        return 1;
-    }
-    else if( c == 10 ) {
-        cursorY += charHeight;
-        return 1;
-    }
-    display->drawString( cursorX, cursorY, String( t ) );
-    cursorX += charWidth;
-    if( (cursorX+charWidth) > maxX ) {
-        cursorX = 0;
-        cursorY += charHeight;
-    }
-    
-    #if ARDUINO >= 100
-        return 1;
-    #endif
+  char t[2];
+  t[0] = c;
+  t[1] = 0;
+
+  if (c == 13) {
+    update();
+    cursorX = 0;
+    return 1;
+  }
+  else if (c == 10) {
+    cursorY += charHeight;
+    return 1;
+  }
+  display->drawString(cursorX, cursorY, String(t));
+  cursorX += charWidth;
+  if ((cursorX + charWidth) > maxX) {
+    cursorX = 0;
+    cursorY += charHeight;
+  }
+
+#if ARDUINO >= 100
+  return 1;
+#endif
 }
 
 
@@ -801,8 +789,8 @@ void ESPert_OLED::setTextColor(uint16_t c) {
 }
 
 void ESPert_OLED::setCursor(int16_t x, int16_t y) {
-    cursorX = x;
-    cursorY = y;
+  cursorX = x;
+  cursorY = y;
 }
 
 int16_t ESPert_OLED::getCursorX() {
@@ -813,9 +801,9 @@ int16_t ESPert_OLED::getCursorY() {
   return cursorY;
 }
 
-void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately) {
+void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately) {
   if (display) {
-    display->drawBitmap(x, y, w, h, (const char *)bitmap);
+    display->drawBitmap(x, y, w, h, (const char*)bitmap);
 
     if (drawImmediately) {
       display->display();
@@ -865,7 +853,7 @@ void ESPert_MQTT2::init(IPAddress server, int port, MQTT_CALLBACK_SIGNATURE) {
   init(server, port, "", "", callback);
 }
 
-void ESPert_MQTT2::init(const char * server, int port, String user, String password, MQTT_CALLBACK_SIGNATURE) {
+void ESPert_MQTT2::init(const char* server, int port, String user, String password, MQTT_CALLBACK_SIGNATURE) {
   mqttUser = user;
   mqttPassword = password;
   setCallback(callback);
@@ -881,11 +869,11 @@ void ESPert_MQTT2::init(const char * server, int port, String user, String passw
   }
 
   mqttClient = new PubSubClient(_client);
-  _espert->println( "Set Server to "+String(server) );
+  _espert->println("ESPert: Set Server to " + String(server));
   mqttClient->setServer(server, 1883);
 }
 
-void ESPert_MQTT2::init(const char * server, int port, MQTT_CALLBACK_SIGNATURE) {
+void ESPert_MQTT2::init(const char* server, int port, MQTT_CALLBACK_SIGNATURE) {
   init(server, port, "", "", callback);
 }
 
@@ -893,7 +881,7 @@ void ESPert_MQTT2::setCallback(MQTT_CALLBACK_SIGNATURE) {
   this->callback = callback;
 }
 
-PubSubClient *ESPert_MQTT2::getPubSubClient() {
+PubSubClient* ESPert_MQTT2::getPubSubClient() {
   return mqttClient;
 }
 
@@ -917,9 +905,9 @@ bool ESPert_MQTT2::connect() {
       String cn = getClientName();
 
       if (mqttUser.length() > 0) {
-        reconnected = mqttClient->connect((const char *)cn.c_str(), mqttUser.c_str(), mqttPassword.c_str());
+        reconnected = mqttClient->connect((const char*)cn.c_str(), mqttUser.c_str(), mqttPassword.c_str());
       } else {
-        reconnected = mqttClient->connect((const char *)cn.c_str());
+        reconnected = mqttClient->connect((const char*)cn.c_str());
       }
 
       if (reconnected) {
@@ -937,7 +925,7 @@ bool ESPert_MQTT2::connect() {
 
 void ESPert_MQTT2::publish(String topic, String value) {
   if (mqttClient && _espert->wifi.getMode() == ESPERT_WIFI_MODE_CONNECT) {
-    mqttClient->publish(topic.c_str(), (char *) value.c_str());
+    mqttClient->publish(topic.c_str(), (char*)value.c_str());
   }
 }
 
@@ -946,9 +934,10 @@ void ESPert_MQTT2::subscribe(String topic) {
     mqttClient->subscribe(topic.c_str());
   }
 }
-// *******************************************
+
+// ****************************************
 // WiFi class
-// *******************************************
+// ****************************************
 ESPert_WiFi::ESPert_WiFi() {
   wifiMode = ESPERT_WIFI_MODE_DISCONNECT;
 }
@@ -971,97 +960,90 @@ int ESPert_WiFi::init() {
     bAutoConfig = false;
   } else if (str == "ESPert:AutoConnect") {
     bAutoConfig = true;
-  } else if ( str == "ESPert:SmartConfig" ) {
-    if (!smartConfig()) {
+  } else if (str == "ESPert:SmartConfig") {
+    if (smartConfig()) {
+      wifiMode = ESPERT_WIFI_MODE_CONNECT;
+      _espert->eeprom.write(237, "ESPert:");
+      _espert->println("ESPert: WiFi smart config connected, local IP " + _espert->wifi.getLocalIP());
+      _espert->button.resetPressTime();
+      return wifiMode;
+    } else {
       _espert->eeprom.write(237, "ESPert:ConfigAP");
       _espert->println("ESPert: WiFi AP on restart!");
 
       delay(100);
       ESP.reset();
+    }
+  } else if (str == "ESPert:ConfigAP") {
+    wifiMode = ESPERT_WIFI_MODE_SETTINGAP;
 
-    } else {
-      wifiMode = ESPERT_WIFI_MODE_CONNECT;
+    _espert->led.on();
+    delay(50);
+    _espert->led.off();
+    delay(50);
+    _espert->led.on();
+    delay(50);
+    _espert->led.off();
+    delay(50);
+    _espert->led.on();
+    delay(50);
+    _espert->led.off();
 
-      _espert->println("ESPert: WiFi smart config connected, local IP " + _espert->wifi.getLocalIP());
-        //WiFi.printDiag(Serial);
+    initSetupAP();
+    _espert->led.off();
 
-      _espert->button.resetPressTime();
-      return wifiMode;
+    _espert->println("ESPert: AP & Server started, softAP IP " + _espert->wifi.getAPIP());
+
+    _espert->oled.print("IP..: ");
+    _espert->oled.println(getAPIP());
+    _espert->oled.print("WiFi: AP Mode");
+
+    int progress = 0;
+    int16_t x = _espert->oled.getCursorX();
+    int16_t y = _espert->oled.getCursorY();
+
+    while (1) {
+      drawProgress(x, y, &progress);
+
+      if (_espert->button.isLongPress()) {
+        _espert->button.resetPressTime();
+        setAutoConnect(false);
+      }
+
+      if (ESPertServer) {
+        ESPertServer->handleClient();
+        _espert->led.on();
+        delay(50);
+        _espert->led.off();
+        delay(50);
+        _espert->led.on();
+        delay(50);
+        _espert->led.off();
+        delay(50);
+        _espert->led.on();
+        delay(50);
+        _espert->led.off();
+      }
+
+      delay(1000);
+      ESP.wdtFeed();
     }
 
-  } else if (str == "ESPert:ConfigAP") {
-        wifiMode = ESPERT_WIFI_MODE_SETTINGAP;
-
-        _espert->led.on();
-        delay(50);
-        _espert->led.off();
-        delay(50);
-        _espert->led.on();
-        delay(50);
-        _espert->led.off();
-        delay(50);
-        _espert->led.on();
-        delay(50);
-        _espert->led.off();
-
-        initSetupAP();
-        _espert->led.off();
-
-        _espert->println("ESPert: AP & Server started, softAP IP " + _espert->wifi.getAPIP());
-
-        _espert->oled.print("IP..: ");
-        _espert->oled.println(getAPIP());
-        _espert->oled.print("WiFi: AP Mode");
-
-        int progress = 0;
-        int16_t x = _espert->oled.getCursorX();
-        int16_t y = _espert->oled.getCursorY();
-
-        while (1) {
-          drawProgress(x, y, &progress);
-
-          if (_espert->button.isLongPress()) {
-            _espert->button.resetPressTime();
-            setAutoConnect(false);
-          }
-
-          if (ESPertServer) {
-            ESPertServer->handleClient();
-            _espert->led.on();
-            delay(50);
-            _espert->led.off();
-            delay(50);
-            _espert->led.on();
-            delay(50);
-            _espert->led.off();
-            delay(50);
-            _espert->led.on();
-            delay(50);
-            _espert->led.off();
-          }
-
-          delay(1000);
-          ESP.wdtFeed();
-        }
-
-        _espert->button.resetPressTime();
+    _espert->button.resetPressTime();
   }
 
   if (bAutoConfig) {
-    if (!test()) {
-      _espert->println( "Test failed." );
+    if (test()) {
+      wifiMode = ESPERT_WIFI_MODE_CONNECT;
+      _espert->println("ESPert: WiFi auto connected, local IP " + _espert->wifi.getLocalIP());
+      _espert->button.resetPressTime();
+    } else {
+      _espert->println("ESPert: Test failed!");
       _espert->eeprom.write(237, "ESPert:SmartConfig");
       _espert->println("ESPert: WiFi SmartConfig on restart!");
 
       delay(100);
       ESP.reset();
-    } else {
-      wifiMode = ESPERT_WIFI_MODE_CONNECT;
-
-      _espert->println("ESPert: WiFi auto connected, local IP " + _espert->wifi.getLocalIP());
-      //WiFi.printDiag(Serial);
-
-      _espert->button.resetPressTime();
     }
   } else {
     wifiMode = ESPERT_WIFI_MODE_DISCONNECT;
@@ -1079,7 +1061,7 @@ int ESPert_WiFi::getMode() {
 bool ESPert_WiFi::smartConfig() {
   _espert->led.on();
   wifiMode = ESPERT_WIFI_MODE_SMARTCONFIG;
-  
+
   int16_t x = _espert->oled.getCursorX();
   int16_t y = _espert->oled.getCursorY();
 
@@ -1094,7 +1076,7 @@ bool ESPert_WiFi::smartConfig() {
   while (1) {
     if (_espert->button.isOn()) {
       if (_espert->button.isLongPress()) {
-        
+
         _espert->button.resetPressTime();
         drawProgress(x, y, NULL);
         _espert->oled.setCursor(x, y);
@@ -1102,8 +1084,6 @@ bool ESPert_WiFi::smartConfig() {
         WiFi.stopSmartConfig();
         _espert->led.off();
         return false;
-        
-
       }
     }
 
@@ -1209,19 +1189,21 @@ void ESPert_WiFi::initSetupAP(void) {
       ESP.wdtFeed();
     }
   }
-  
-  WiFi.disconnect();
-  delay(100);
-  _espert->println( "AP: " + _espert->info.getId() );
-  WiFi.softAP(_espert->info.getId().c_str());
 
   _espert->println();
+
+  WiFi.disconnect();
+  delay(100);
+  _espert->println("ESPert: Access Point " + _espert->info.getId());
+  WiFi.softAP(_espert->info.getId().c_str(), "");
+  WiFi.mode(WIFI_AP_STA);
+
   _espert->println("ESPert: WiFi connected, softAP IP " + _espert->wifi.getAPIP());
 
-  if (!ESPertMDNS.begin("ESPert.setup", WiFi.softAPIP())) {
-    _espert->println("ESPert: Error setting up MDNS responder!");
-  } else {
+  if (ESPertMDNS.begin("ESPert.setup", WiFi.softAPIP())) {
     _espert->println("ESPert: MDNS responder started!");
+  } else {
+    _espert->println("ESPert: Error setting up MDNS responder!");
   }
 
   initSetupServer();
@@ -1230,7 +1212,7 @@ void ESPert_WiFi::initSetupAP(void) {
 bool ESPert_WiFi::test(int timeOut) {
   int c = 0;
   _espert->println("ESPert: Waiting for WiFi to connect!");
-  _espert->oled.println( "Connecting..." );
+  _espert->oled.println("Connecting...");
 
   int progress = 0;
   int16_t x = _espert->oled.getCursorX();
@@ -1241,15 +1223,15 @@ bool ESPert_WiFi::test(int timeOut) {
       _espert->println("ESPert: Connected!");
       return true;
     }
-    drawProgress(x, y, &progress);
 
+    drawProgress(x, y, &progress);
     delay(1000);
     int n = WiFi.status();
 
     if (n == 0) {
       _espert->println("ESPert: No ESP auto connect info!");
       _espert->led.off();
-      _espert->oled.println( "No auto connect info" );
+      _espert->oled.println("No auto connect info");
       return false;
     }
 
@@ -1363,14 +1345,14 @@ void ESPert_WiFi::initSetupServer() {
       int c = 0;
       _espert->println("ESPert: Waiting for WiFi to connect!");
       _espert->oled.clear();
-      _espert->oled.println( "Connecting..." );
+      _espert->oled.println("Connecting...");
 
       while (c < 15) {
         if (WiFi.status() == WL_CONNECTED) {
           _espert->println();
           _espert->println("ESPert: WiFi connected OK, local IP " + _espert->wifi.getLocalIP());
           _espert->eeprom.write(237, "ESPert:");
-          delay( 100 );
+          delay(100);
           break;
         }
 
@@ -1467,7 +1449,7 @@ String ESPert_WiFi::getAPIP() {
   return String(textID);
 }
 
-void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int *progress) {
+void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int* progress) {
   if (_espert->oled.isReady()) {
     _espert->oled.setCursor(x, y);
     _espert->oled.setTextColor(ESPERT_BLACK);
@@ -1491,123 +1473,105 @@ void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int *progress) {
   }
 }
 
-String ESPert_WiFi::getHTTP( const char *_host, const char *_path )
-{
+String ESPert_WiFi::getHTTP(const char* _host, const char* _path) {
   int err = 0;
-  int response_code = 0;  
+  int response_code = 0;
 
-  _espert->print( "Connecting to " );
-  _espert->println( _host );
+  _espert->print("ESPert: Connecting to ");
+  _espert->println(_host);
 
   WiFiClient client;
-  _espert->print( "Requesting URL: " );
-  _espert->print( _host );
-  _espert->println( _path ); 
+  _espert->print("ESPert: Requesting URL: ");
+  _espert->print(_host);
+  _espert->println(_path);
 
   String response = "";
 
   JS_HttpClient http(client);
   err = http.get(_host, _path);
-  if (err == 0)
-  {
-      _espert->print("Got status code: ");
-      _espert->println(err);
+  if (err == 0) {
+    _espert->print("ESPert: Got status code ");
+    _espert->println(err);
 
-      // Usually you'd check that the response code is 200 or a
-      // similar "success" code (200-299) before carrying on,
-      // but we'll print out whatever response we get
-      response_code = http.responseStatusCode();
-      
-      _espert->print("Got response code: ");
-      _espert->println(response_code);
-      
-      err = http.skipResponseHeaders();
-      if (err >= 0)
-      {   
-        int bodyLen = http.contentLength();
-        _espert->print("Content length is: ");
-        _espert->println(bodyLen);
-        _espert->print("");
-        _espert->println("Body returned follows:");
-      
-        // Now we've got to the body, so we can print it out
-        unsigned long timeoutStart = millis();
-        char c;
-        int iChunkState = eReadingContentLength;
-        int iChunkLength = 0;
-        // Whilst we haven't timed out & haven't reached the end of the body
-        while ( (http.connected() || http.available()) &&
-               ((millis() - timeoutStart) < kNetworkTimeout) )
-        {
-            if (http.available())
-            {
-                c = http.read();
-                if( http.isChunk ) {
-                    switch(iChunkState)
-                    {
-                    case eReadingContentLength:
-                        if (isdigit(c))
-                        {
-                            iChunkLength = iChunkLength*16 + (c - '0');
-                        }
-                        else if( c >= 'a' && c <= 'f' )
-                        {
-                            iChunkLength = iChunkLength*16 + (c - 'a' + 10);
-                        }
-                        else if( c >= 'A' && c <= 'F' )
-                        {
-                            iChunkLength = iChunkLength*16 + (c - 'A' + 10);
-                        }
-                        else if( c == '\r' ) {
-                        }
-                        else
-                        {
-                            _espert->print( "Chunk length: " );
-                            _espert->println( iChunkLength );
-                            iChunkState = eReadingBody;
-                        }
-                        break;
-                    case eReadingBody:
-                        if( iChunkLength > 0 ) {
-                            response = response + c;
-                            iChunkLength--;
-                            if( iChunkLength == 0 )
-                                iChunkState = eReadingContentLength;
-                        }
-                        break;
-                    }
+    // Usually you'd check that the response code is 200 or a
+    // similar "success" code (200-299) before carrying on,
+    // but we'll print out whatever response we get
+    response_code = http.responseStatusCode();
+
+    _espert->print("ESPert: Got response code ");
+    _espert->println(response_code);
+
+    err = http.skipResponseHeaders();
+    if (err >= 0) {
+      int bodyLen = http.contentLength();
+      _espert->print("ESPert: Content length is ");
+      _espert->println(bodyLen);
+      _espert->print("");
+      _espert->println("ESPert: Body returned follows");
+
+      // Now we've got to the body, so we can print it out
+      unsigned long timeoutStart = millis();
+      char c = 0;
+      int iChunkState = eReadingContentLength;
+      int iChunkLength = 0;
+
+      // Whilst we haven't timed out & haven't reached the end of the body
+      while ((http.connected() || http.available()) && ((millis() - timeoutStart) < kNetworkTimeout)) {
+        if (http.available()) {
+          c = http.read();
+
+          if (http.isChunk) {
+            switch (iChunkState) {
+              case eReadingContentLength:
+                if (isdigit(c)) {
+                  iChunkLength = iChunkLength * 16 + (c - '0');
+                } else if (c >= 'a' && c <= 'f') {
+                  iChunkLength = iChunkLength * 16 + (c - 'a' + 10);
+                } else if (c >= 'A' && c <= 'F') {
+                  iChunkLength = iChunkLength * 16 + (c - 'A' + 10);
+                } else if (c == '\r') {
+                } else {
+                  _espert->print("ESPert: Chunk length ");
+                  _espert->println(iChunkLength);
+                  iChunkState = eReadingBody;
                 }
-                else {
-                    response = response + c;
+                break;
+
+              case eReadingBody:
+                if (iChunkLength > 0) {
+                  response = response + c;
+                  iChunkLength--;
+                  if (iChunkLength == 0)
+                    iChunkState = eReadingContentLength;
                 }
-                // Print out this character
-                _espert->print(c);
-                bodyLen--;
-                // We read something, reset the timeout counter
-                timeoutStart = millis();
+                break;
             }
-            else
-            {
-                // We haven't got any data, so let's pause to allow some to
-                // arrive
-                delay(kNetworkDelay);
-            }
+          } else {
+            response = response + c;
+          }
+
+          // Print out this character
+          _espert->print(c);
+          bodyLen--;
+          // We read something, reset the timeout counter
+          timeoutStart = millis();
+        } else {
+          // We haven't got any data, so let's pause to allow some to arrive
+          delay(kNetworkDelay);
         }
       }
-      else
-      {
-        _espert->print("Failed to skip response headers: ");
-        _espert->println(err);
-      }        
-  }
-  else
-  {
-    _espert->print("Connect failed: ");
+    } else {
+      _espert->print("ESPert: Failed to skip response headers - ");
+      _espert->println(err);
+    }
+  } else {
+    _espert->print("ESPert: Connect failed - ");
     _espert->println(err);
   }
-  _espert->print( "\r\nResponse:\r\n" );
-  _espert->print( response );
- _espert->println( "---\r\n" );
+
+  _espert->print("\r\nESPert: Response:\r\n");
+  _espert->print(response);
+  _espert->println("---\r\n");
 
   return response;
 }
@@ -1627,9 +1591,9 @@ bool ESPert_GroveButton::get() {
   return !ESPert_Button::get();
 }
 
-// *************************************************
+// ****************************************
 // GroveLED class
-// *************************************************
+// ****************************************
 void ESPert_GroveLED::on() {
   ESPert_LED::set(false);
 }
@@ -1646,9 +1610,9 @@ int ESPert_GroveLED::get() {
   return !ESPert_LED::get();
 }
 
-// *************************************************
+// ****************************************
 // GroveRelay class
-// *************************************************
+// ****************************************
 void ESPert_GroveRelay::on() {
   ESPert_LED::set(false);
 }
@@ -1665,122 +1629,106 @@ int ESPert_GroveRelay::get() {
   return !ESPert_LED::get();
 }
 
-void ESPert_Buzzer::init(int pin )
-{
-    this->pin = pin;
+// ****************************************
+// Buzzer Class
+// ****************************************
+void ESPert_Buzzer::init(int pin) {
+  this->pin = pin;
 }
 
-void ESPert_Buzzer::beep( int freeq, int duration )
-{
-  analogWrite(pin, freeq);      // Almost any value can be used except 0 and 255
-                           // experiment to get the best tone
-  delay(duration);          // wait for a delayms ms
-  analogWrite(pin, 0);       // 0 turns it off
+void ESPert_Buzzer::beep(int freeq, int duration) {
+  analogWrite(pin, freeq); // Almost any value can be used except 0 and 255 experiment to get the best tone
+  delay(duration);         // wait for a delayms ms
+  analogWrite(pin, 0);     // 0 turns it off
 }
 
-void ESPert_Buzzer::on( int freeq )
-{
-  analogWrite(pin, freeq);      // Almost any value can be used except 0 and 255
-                           // experiment to get the best tone
+void ESPert_Buzzer::on(int freeq) {
+  analogWrite(pin, freeq); // Almost any value can be used except 0 and 255 experiment to get the best tone
 }
 
-void ESPert_Buzzer::off( )
-{
-  analogWrite(pin, 0);       // 0 turns it off
+void ESPert_Buzzer::off() {
+  analogWrite(pin, 0); // 0 turns it off
 }
 
-// *************************************************
+// ****************************************
 // NeoPixel Class
-// *************************************************
-void ESPERT_NeoPixel::init(uint8_t p, uint8_t n)
-{
-    if (!_neopixel)
-    {
-        this->_neopixel = new Adafruit_NeoPixel(n , p , NEO_GRB + NEO_KHZ800);
-    }
-    this->_neopixel->begin();
-    this->_neopixel->show();
+// ****************************************
+void ESPERT_NeoPixel::init(uint8_t p, uint8_t n) {
+  if (!_neopixel) {
+    this->_neopixel = new Adafruit_NeoPixel(n , p , NEO_GRB + NEO_KHZ800);
+  }
+
+  this->_neopixel->begin();
+  this->_neopixel->show();
 }
 
-void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b)
-{
-    this->_neopixel->setPixelColor(n,r,g,b);
+void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
+  this->_neopixel->setPixelColor(n, r, g, b);
 }
 
-void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b, uint8_t w)
-{
-    this->_neopixel->setPixelColor(n,r,g,b,w);
+void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b, uint8_t w) {
+  this->_neopixel->setPixelColor(n, r, g, b, w);
 }
 
-void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint32_t c)
-{
-    this->_neopixel->setPixelColor(n,c);
+void ESPERT_NeoPixel::setPixelColor(uint16_t n, uint32_t c) {
+  this->_neopixel->setPixelColor(n, c);
 }
 
-void ESPERT_NeoPixel::show()
-{
-    this->_neopixel->show();
+void ESPERT_NeoPixel::show() {
+  this->_neopixel->show();
 }
 
-void ESPERT_NeoPixel::clear()
-{
-    this->_neopixel->clear();
+void ESPERT_NeoPixel::clear() {
+  this->_neopixel->clear();
 }
 
-void ESPERT_NeoPixel::off()
-{
-    this->_neopixel->clear();
-    this->_neopixel->show();
+void ESPERT_NeoPixel::off() {
+  this->_neopixel->clear();
+  this->_neopixel->show();
 }
 
-void ESPERT_NeoPixel::setColor(uint8_t r, uint8_t g, uint8_t b)
-{
-    for (uint8_t i=0;i < this->_neopixel->numPixels() ; i++)
-    {
-        this->_neopixel->setPixelColor(i,r,g,b);
-    }
-    this->_neopixel->show();
+void ESPERT_NeoPixel::setColor(uint8_t r, uint8_t g, uint8_t b) {
+  for (uint8_t i = 0; i < this->_neopixel->numPixels() ; i++) {
+    this->_neopixel->setPixelColor(i, r, g, b);
+  }
+
+  this->_neopixel->show();
 }
 
-void ESPERT_NeoPixel::setColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w)
-{
-    for (uint8_t i=0;i < this->_neopixel->numPixels() ; i++)
-    {
-        this->_neopixel->setPixelColor(i,r,g,b,w);
-    }
+void ESPERT_NeoPixel::setColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w) {
+  for (uint8_t i = 0; i < this->_neopixel->numPixels() ; i++) {
+    this->_neopixel->setPixelColor(i, r, g, b, w);
+  }
 }
 
-void ESPERT_NeoPixel::setColor(uint32_t c)
-{
-    for (uint8_t i=0;i < this->_neopixel->numPixels() ; i++)
-    {
-        this->_neopixel->setPixelColor(i,c);
-    }
-    this->_neopixel->show();
+void ESPERT_NeoPixel::setColor(uint32_t c) {
+  for (uint8_t i = 0; i < this->_neopixel->numPixels() ; i++) {
+    this->_neopixel->setPixelColor(i, c);
+  }
+
+  this->_neopixel->show();
 }
 
-void ESPERT_NeoPixel::rainbow()
-{
-    for(uint8_t i=0; i< this->_neopixel->numPixels(); i++)
-    {
-        //strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-        this->_neopixel->setPixelColor(i, Wheel(((i * 256 / this->_neopixel->numPixels())) & 255));
-    }
-    this->_neopixel->show();
+void ESPERT_NeoPixel::rainbow() {
+  for (uint8_t i = 0; i < this->_neopixel->numPixels(); i++) {
+    this->_neopixel->setPixelColor(i, Wheel(((i * 256 / this->_neopixel->numPixels())) & 255));
+  }
+
+  this->_neopixel->show();
 }
 
-uint32_t ESPERT_NeoPixel::Wheel(byte WheelPos) 
-{
-    WheelPos = 255 - WheelPos;
-    if(WheelPos < 85) {
-        return this->_neopixel->Color(255 - WheelPos * 3, 0, WheelPos * 3);
-    }
-    if(WheelPos < 170) {
+uint32_t ESPERT_NeoPixel::Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+
+  if (WheelPos < 85) {
+    return this->_neopixel->Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+
+  if (WheelPos < 170) {
     WheelPos -= 85;
-        return this->_neopixel->Color(0, WheelPos * 3, 255 - WheelPos * 3);
-    }
+    return this->_neopixel->Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
 
-    WheelPos -= 170;
-    return this->_neopixel->Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  WheelPos -= 170;
+  return this->_neopixel->Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
-

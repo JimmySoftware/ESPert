@@ -1,4 +1,10 @@
+//#define ESPERT_BOARD_ESPRESSO_LITE2
+
+#ifdef ESPERT_BOARD_ESPRESSO_LITE2
+static const int PIN_LED = 2; // ESPresso Lite v2.0
+#else
 static const int PIN_LED = 16; // ESPresso Lite
+#endif
 
 void setup() {
   Serial.begin(115200);

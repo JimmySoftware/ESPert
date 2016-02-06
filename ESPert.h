@@ -17,12 +17,16 @@
 #include <JS_HttpClient.h>
 #include <SSD1306.h>
 #include <Adafruit_NeoPixel.h>
+#include "logo.h"
 
 static const float ESPERT_LIBRARY_VERSION = 0.8f;
 
-#define ESPERT_BOARD_GENERIC            0
-#define ESPERT_BOARD_ESPRESSO_LITE      1
-#define ESPERT_BOARD_ESP201             2
+#define ESPERT_BOARD_GENERIC        0
+#define ESPERT_BOARD_ESP201         1
+#define ESPERT_BOARD_ESPRESSO_LITE  2
+#define ESPERT_BOARD_ESPRESSO_LITE2 3
+
+static int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE; // default
 
 #ifdef ESPERT_DEBUG
 
@@ -60,20 +64,32 @@ static const float ESPERT_LIBRARY_VERSION = 0.8f;
 #define ESPERT_WIFI_MODE_SMARTCONFIG 2
 #define ESPERT_WIFI_MODE_SETTINGAP   3
 
-static int ESPertBoardType = ESPERT_BOARD_GENERIC;
+#define ColorRed    0xFF0000
+#define ColorGreen  0x008000
+#define ColorBlue   0x0000FF
+#define ColorCyan   0x00FFFF
+#define ColorPurple 0x800080
+#define ColorGray   0x808080
+#define ColorBrown  0xA52A2A
+#define ColorSilver 0xC0C0C0
+#define ColorViolet 0xEE82EE
+#define ColorPink   0xFFC0CB
+#define ColorGold   0xFFD700
+#define ColorYellow 0xFFFF00
+#define ColorWhite  0xFFFFFF
 
-static int ESPERT_PIN_LED = 16;
+static int ESPERT_PIN_LED    = 16;
 static int ESPERT_PIN_BUTTON = 2;
-static int ESPERT_PIN_SDA = 4;
-static int ESPERT_PIN_SCL = 5;
-static int ESPERT_PIN_DHT = 12;
+static int ESPERT_PIN_SDA    = 4;
+static int ESPERT_PIN_SCL    = 5;
+static int ESPERT_PIN_DHT    = 12;
 
-static int ESPERT_DHT_TYPE = DHT22;
+static int ESPERT_DHT_TYPE   = DHT22;
 
 static const long ESPertFlashID[] = {0x1640EF, 0x1340C8, 0x1340EF}; // Little Endian
 static const String ESPertFlashDesc[] = {"WINBOND W25Q32: 32M-bit / 4M-byte", "GIGADEVICE GD25Q40 4M-bit / 512K-byte", "WINBOND W25Q40 4M-bit / 512K-byte"};
 
-static ESP8266WebServer *ESPertServer = NULL;
+static ESP8266WebServer* ESPertServer = NULL;
 static MDNSResponder ESPertMDNS;
 
 static String ESPertNetworks[32] = {""};
@@ -88,10 +104,27 @@ static String ESPertContent = "";
 
 static String ESPertReadString; // rx tx buffer
 
+typedef enum {
+  eIdle,
+  eRequestStarted,
+  eRequestSent,
+  eReadingStatusCode,
+  eStatusCodeRead,
+  eReadingContentLength,
+  eSkipToEndOfHeader,
+  eLineStartingCRFound,
+  eReadingBody
+} tHttpState;
+
+// Number of milliseconds to wait without receiving any data before we give up
+const int kNetworkTimeout = 30 * 1000;
+// Number of milliseconds to wait if no data is available before trying again
+const int kNetworkDelay = 1000;
+
 class ESPert_SoftwareSerial : public Stream
 {
   public:
-    SoftwareSerial *swSerial;
+    SoftwareSerial* swSerial;
     using Print::write;
     ESPert_SoftwareSerial();
     void init(int rx = 12, int tx = 14, int buffer = 128);
@@ -107,11 +140,11 @@ class ESPert_SoftwareSerial : public Stream
 class ESPert_BLE
 {
   private:
-    ESPert_SoftwareSerial *swSerial;
+    ESPert_SoftwareSerial* swSerial;
 
   public:
     ESPert_BLE();
-    bool init(ESPert_SoftwareSerial *swSer);
+    bool init(ESPert_SoftwareSerial* swSer);
     String getFirmwareVersion();
     bool isOn();
     bool isOff();
@@ -121,7 +154,6 @@ class ESPert_BLE
     int getMajor();
     int getMinor();
     int getTXPower();
-
 };
 
 class ESPert_Button
@@ -148,7 +180,7 @@ class ESPert_Button
 class ESPert_DHT
 {
   private:
-    DHT *dht;
+    DHT* dht;
     int dhtPin;
     int dhtType;
 
@@ -220,7 +252,7 @@ class ESPert_LED
 class ESPert_OLED : public Print
 {
   private:
-    SSD1306 *display;
+    SSD1306* display;
 
   public:
     ESPert_OLED();
@@ -232,29 +264,29 @@ class ESPert_OLED : public Print
     void setCursor(int16_t x, int16_t y);
     int16_t getCursorX();
     int16_t getCursorY();
-    void drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately = true);
+    void drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately = true);
     void update();
-    
+
     int cursorX;
     int cursorY;
-    
+
     int charWidth;
     int charHeight;
-    
+
     const int maxX = 128;
     const int maxY = 64;
-    
-    #if ARDUINO >= 100
+
+#if ARDUINO >= 100
     virtual size_t write(uint8_t);
-    #else
+#else
     virtual void write(uint8_t);
-    #endif
+#endif
 };
 
 class ESPert_MQTT2
 {
   private:
-    PubSubClient *mqttClient = NULL;
+    PubSubClient* mqttClient = NULL;
     MQTT_CALLBACK_SIGNATURE;
     String mqttUser;
     String mqttPassword;
@@ -264,13 +296,13 @@ class ESPert_MQTT2
     ESPert_MQTT2();
     void init(IPAddress server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
     void init(IPAddress server, int port, MQTT_CALLBACK_SIGNATURE);
-    void init(const char * server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
-    void init(const char * server, int port, MQTT_CALLBACK_SIGNATURE);
-    
+    void init(const char* server, int port, String user = "", String password = "", MQTT_CALLBACK_SIGNATURE = NULL);
+    void init(const char* server, int port, MQTT_CALLBACK_SIGNATURE);
+
     void setCallback(MQTT_CALLBACK_SIGNATURE = NULL);
-    
+
     String getClientName();
-    PubSubClient *getPubSubClient();
+    PubSubClient* getPubSubClient();
     void publish(String topic, String value);
     void subscribe(String topic);
     bool connect();
@@ -280,7 +312,7 @@ class ESPert_WiFi
 {
   private:
     int wifiMode;
-    void drawProgress(int16_t x, int16_t y, int *progress = NULL);
+    void drawProgress(int16_t x, int16_t y, int* progress = NULL);
 
   public:
     ESPert_WiFi();
@@ -294,8 +326,8 @@ class ESPert_WiFi
     void disconnect(bool reset = true);
     String getLocalIP();
     String getAPIP();
-    
-    String getHTTP( const char *host, const char *path );
+
+    String getHTTP(const char* host, const char* path);
 };
 
 class ESPert_GroveButton: public ESPert_Button
@@ -327,9 +359,9 @@ class ESPert_GroveRelay: public ESPert_LED
 class ESPert_Grove
 {
   public:
-    ESPert_GroveButton    button;
-    ESPert_GroveLED       led;
-    ESPert_GroveRelay     relay;
+    ESPert_GroveButton button;
+    ESPert_GroveLED    led;
+    ESPert_GroveRelay  relay;
 };
 
 class ESPert_Buzzer
@@ -339,42 +371,29 @@ class ESPert_Buzzer
 
   public:
     void init(int pin = -1);
-    void beep( int freeq, int duration );
-    void on( int freq );
+    void beep(int freeq, int duration);
+    void on(int freq);
     void off();
 };
 
-#define ColorRed     0xFF0000
-#define ColorGreen   0x008000
-#define ColorBlue    0x0000FF
-#define ColorCyan    0x00FFFF
-#define ColorPurple  0x800080
-#define ColorGray    0x808080
-#define ColorBrown   0xA52A2A
-#define ColorSilver  0xC0C0C0
-#define ColorViolet  0xEE82EE
-#define ColorPink    0xFFC0CB
-#define ColorGold    0xFFD700
-#define ColorYellow  0xFFFF00
-#define ColorWhite   0xFFFFFF
-
 class ESPERT_NeoPixel // WS2812
 {
-	private:
-        Adafruit_NeoPixel *_neopixel;
-	public:
-		void init(uint8_t p = 14, uint8_t n = 8);
-    	void setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b);
-    	void setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b, uint8_t w);
-    	void setPixelColor(uint16_t n, uint32_t c);
-    	void setColor(uint8_t r, uint8_t g, uint8_t b);
-    	void setColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w);
-    	void setColor(uint32_t c);
-    	void clear();
-        void off();
-    	void show();
-    	void rainbow();
-        uint32_t Wheel(byte WheelPos);
+  private:
+    Adafruit_NeoPixel* _neopixel;
+
+  public:
+    void init(uint8_t p = 14, uint8_t n = 8);
+    void setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b);
+    void setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b, uint8_t w);
+    void setPixelColor(uint16_t n, uint32_t c);
+    void setColor(uint8_t r, uint8_t g, uint8_t b);
+    void setColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w);
+    void setColor(uint32_t c);
+    void clear();
+    void off();
+    void show();
+    void rainbow();
+    uint32_t Wheel(byte WheelPos);
 };
 
 class ESPert : public Print
@@ -393,10 +412,10 @@ class ESPert : public Print
     ESPert_SoftwareSerial swSerial;
     ESPert_WiFi           wifi;
     ESPert_Buzzer         buzzer;
-    ESPERT_NeoPixel  	  neopixel;
+    ESPERT_NeoPixel  	    neopixel;
 
     ESPert();
-    void init(int type = ESPERT_BOARD_ESPRESSO_LITE);
+    void init(int type = -1, long baud = 115200);
     void loop();
     String macToString(const uint8_t* mac);
     bool checkFlashSize();

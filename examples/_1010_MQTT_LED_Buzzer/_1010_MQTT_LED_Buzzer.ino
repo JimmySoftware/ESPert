@@ -2,64 +2,54 @@
 
 ESPert espert;
 
-//IPAddress mqtt_server(192,168,77,1);
 const char* mqtt_server = "mqtt.espert.io";
 
 int currentSwitch = true;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/LED";
-
 String inTopic = "ESPert/" + String(espert.info.getChipId()) + "/LED";
 
-#define pinBuzzer 15 // ESPresso Lite
+#define pinBuzzer 15
 
-void beep(unsigned char delayms){
-  analogWrite(pinBuzzer, 60);      // Almost any value can be used except 0 and 255
-                           // experiment to get the best tone
-  delay(delayms);          // wait for a delayms ms
-  analogWrite(pinBuzzer, 0);       // 0 turns it off
-  delay(delayms);          // wait for a delayms ms   
-} 
+void beep(unsigned char delayms) {
+  analogWrite(pinBuzzer, 60); // Almost any value can be used except 0 and 255 experiment to get the best tone
+  delay(delayms);             // wait for a delayms ms
+  analogWrite(pinBuzzer, 0);  // 0 turns it off
+  delay(delayms);             // wait for a delayms ms
+}
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  byte* p = (byte*)malloc(length+1);
-  // Copy the payload to the new buffer
-  memcpy(p,payload,length);
-  p[length] = 0;
-  String strPayload = String((char *)p);
-  free(p);
-  
+  String strPayload = String((char*)payload).substring(0, length);
   espert.println("Receive: " + strPayload);
-  String key = "cmd";
 
-  if (espert.json.init(strPayload) && espert.json.containsKey(key)) {
-  
-    String value = espert.json.get(key);
+  if (espert.json.init(strPayload)) {
+    if (espert.json.containsKey("cmd")) {
+      String value = espert.json.get("cmd");
 
-    if (value == "0") {
-      espert.led.off();
-      espert.println("LED: Off");
-    } else if (value == "1") {
-      espert.led.on();
-      espert.println("LED: On");
-    } else if (value == "2") {
-      if( espert.led.isOn() ) {
+      if (value == "0") {
         espert.led.off();
-        espert.println("LED (Toglle): off");
-      }
-      else {
+        espert.println("LED: Off");
+      } else if (value == "1") {
         espert.led.on();
-        espert.println("LED (Toglle): On");
+        espert.println("LED: On");
+      } else if (value == "2") {
+        if (espert.led.isOn()) {
+          espert.led.off();
+          espert.println("LED (Toglle): off");
+        } else {
+          espert.led.on();
+          espert.println("LED (Toglle): On");
+        }
       }
+
+      beep(50);
+      beep(50);
+      beep(50);
+
+      String outString = "{\"status\":\"" + String(espert.led.isOn() ? 1 : 0) + "\", ";
+      outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
+      espert.println("Send...: " + outString);
+      espert.mqtt.publish(outTopic, outString);
     }
-
-    beep(50);
-    beep(50);
-    beep(50);
-
-    String outString  = "{\"status\":\"" + String(espert.led.isOn() ? 1 : 0) + "\", ";
-    outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
-    espert.println("Send...: " + outString);
-    espert.mqtt.publish(outTopic, outString);
   }
 }
 
@@ -102,11 +92,10 @@ void loop() {
   bool buttonPressed = espert.button.isOn();
 
   if (buttonPressed != currentSwitch) {
-    String outString  = "{\"cmd\":\"" + String(buttonPressed ? 1 : 0) + "\", ";
+    String outString = "{\"cmd\":\"" + String(buttonPressed ? 1 : 0) + "\", ";
     outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
     espert.println("Send...: " + outString);
     espert.mqtt.publish(outTopic, outString);
     currentSwitch = buttonPressed;
   }
 }
-

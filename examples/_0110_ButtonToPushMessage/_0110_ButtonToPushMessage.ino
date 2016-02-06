@@ -6,7 +6,7 @@ const char *host = "www.espert.io";
 const int httpPort = 80;
 
 String message = "Hello from ESPresso Lite!";
-String smartphone_key = "5695159920492544";
+String smartphone_key = "0000000000000000";
 
 bool currentSwitch = true;
 
@@ -46,10 +46,10 @@ void loop() {
     if (buttonPressed) {
       espert.println("Button: On");
       espert.led.on();
-      espert.println( "Connecting..." );
-      message.replace( String(" "), String("%20") );
+      espert.println("Connecting...");
+      message.replace(String(" "), String("%20"));
       String path = "/MySmartphone/send?key=" + smartphone_key + "&message=" + message;
-      espert.println( ">>" + espert.wifi.getHTTP( host, path.c_str() ) + "<<" );
+      espert.println(">>" + espert.wifi.getHTTP(host, path.c_str()) + "<<");
     } else {
       espert.println("Button: Off");
       espert.led.off();
@@ -58,7 +58,5 @@ void loop() {
     currentSwitch = buttonPressed;
   }
 
-  
-  delay( 500 ); 
+  delay(500);
 }
-

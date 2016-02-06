@@ -27,29 +27,28 @@ void setup() {
   espert.init();
   espert.oled.init();
   espert.oled.clear();
-  espert.oled.println( "Reason: "+String(reason) ); 
-  espert.oled.println( "Caurse: "+String(cause) ); 
-  espert.oled.println( "RTC: " + String(rtc_time) );
-  espert.oled.println( "Clock: " + String(clock_time) );
+  espert.oled.println("Reason: " + String(reason));
+  espert.oled.println("Caurse: " + String(cause));
+  espert.oled.println("RTC...: " + String(rtc_time));
+  espert.oled.println("Clock.: " + String(clock_time));
 
-  led.init( 12 );
+  led.init(12);
 }
 
 void loop() {
-  
-  espert.println( "ON" );
+  espert.println("ON");
   led.on();
-  delay( 1000 );
-  Serial.println( "OFF" );
+  delay(1000);
+  Serial.println("OFF");
   led.off();
-  delay( 1000 );
+  delay(1000);
 
-  espert.println( "ON" );
+  espert.println("ON");
   led.on();
-  delay( 1000 );
-  Serial.println( "OFF" );
+  delay(1000);
+  Serial.println("OFF");
   led.off();
-  delay( 1000 );
+  delay(1000);
 
   ESP.deepSleep(sleepTimeS * 1000000);
 }

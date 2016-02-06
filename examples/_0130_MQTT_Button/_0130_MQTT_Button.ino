@@ -2,14 +2,13 @@
 
 ESPert espert;
 
-//IPAddress mqtt_server(192,168,77,1);
-const char * mqtt_server = "mqtt.espert.io";
+const char* mqtt_server = "mqtt.espert.io";
 
 int currentSwitch = true;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/Button";
 
 void setup() {
-  espert.init(ESPERT_BOARD_ESPRESSO_LITE);
+  espert.init();
 
   espert.oled.init();
   delay(2000);
@@ -50,7 +49,7 @@ void loop() {
       espert.led.off();
     }
 
-    String outString  = "{\"button\":\"" + String(buttonPressed ? 1 : 0) + "\", ";
+    String outString = "{\"button\":\"" + String(buttonPressed ? 1 : 0) + "\", ";
     outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
     espert.println(outString);
     espert.mqtt.publish(outTopic, outString);

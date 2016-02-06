@@ -1,7 +1,5 @@
 #include <ESPert.h>
 
-
-
 ESPert espert;
 bool currentSwitch = true;
 
@@ -9,8 +7,8 @@ ESPert_Button button;
 
 void setup() {
   espert.init();
-  button.init( 14 );
-  espert.println("Press USER button to turn on LED.");
+  button.init(14);
+  espert.println("Press the external button to turn on LED.");
 }
 
 void loop() {

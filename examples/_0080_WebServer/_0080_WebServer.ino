@@ -7,19 +7,16 @@ void init_server() {
   server = new ESP8266WebServer(80);
 
   server->on("/", []() {
+    String html = "Failed to read temperature and humidity from DHT sensor!";
     bool isFarenheit = false;
     float t = espert.dht.getTemperature(isFarenheit);
     float h = espert.dht.getHumidity();
-    String dht = "";
 
     if (!isnan(t) && !isnan(h)) {
-      dht += "Temperature: " + String(t) + (isFarenheit ?  " F" : " C") + "<br>";
-      dht += "Humidity: " + String(h) + " %";
-    } else {
-      dht = "Failed to read temperature and humidity from DHT sensor!";
+      html = "Temperature: " + String((int)t) + (isFarenheit ? "°F" : "°C") + "<br>Humidity: " + String((int)h) + "%";
     }
 
-    server->send(200, "text/html", dht);
+    server->send(200, "text/html", html);
   });
 
   server->begin();

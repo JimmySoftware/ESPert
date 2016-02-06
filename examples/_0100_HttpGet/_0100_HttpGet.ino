@@ -36,9 +36,8 @@ void setup() {
 void loop() {
   espert.loop();
 
-  espert.println( "Connecting..." );
-  espert.println( ">>" + espert.wifi.getHTTP( host, path ) + "<<" );
-  
-  delay( 5000 ); 
-}
+  espert.println("Connecting...");
+  espert.println(">>" + espert.wifi.getHTTP(host, path) + "<<");
 
+  delay(5000);
+}
