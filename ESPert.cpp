@@ -1105,7 +1105,7 @@ bool ESPert_WiFi::smartConfig() {
       int timeOut = 10;
       ESP.wdtFeed();
 
-      while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+      while (WiFi.status() != WL_CONNECTED) {
         ESP.wdtFeed();
 
         if (--timeOut <= 0) {
@@ -1124,22 +1124,17 @@ bool ESPert_WiFi::smartConfig() {
 
       _espert->println();
       drawProgress(x, y, NULL);
+      _espert->oled.setCursor(x, y);
+      _espert->oled.println();
 
       if (timeOut == 0) {
         _espert->println("ESPert: WiFi smart connect failed!");
-
-        _espert->oled.setCursor(x, y);
-        _espert->oled.println();
         _espert->oled.println("WiFi: Failed!");
-
         _espert->led.off();
         ESP.wdtFeed();
         return false;
       } else {
         _espert->println("ESPert: WiFi smart connect success!");
-
-        _espert->oled.setCursor(x, y);
-        _espert->oled.println();
         _espert->oled.println("WiFi: Success!");
       }
 
@@ -1212,15 +1207,18 @@ void ESPert_WiFi::initSetupAP(void) {
 bool ESPert_WiFi::test(int timeOut) {
   int c = 0;
   _espert->println("ESPert: Waiting for WiFi to connect!");
-  _espert->oled.println("Connecting...");
+  _espert->oled.print("WiFi: Connecting");
 
   int progress = 0;
   int16_t x = _espert->oled.getCursorX();
   int16_t y = _espert->oled.getCursorY();
+
   while (timeOut == -1 || (timeOut != -1 && c < timeOut)) {
     if (WiFi.status() == WL_CONNECTED) {
       _espert->println();
       _espert->println("ESPert: Connected!");
+      _espert->oled.println();
+      _espert->oled.println("WiFi: Success!");
       return true;
     }
 
@@ -1231,7 +1229,8 @@ bool ESPert_WiFi::test(int timeOut) {
     if (n == 0) {
       _espert->println("ESPert: No ESP auto connect info!");
       _espert->led.off();
-      _espert->oled.println("No auto connect info");
+      _espert->oled.println();
+      _espert->oled.println("WiFi: No Auto Connect!");
       return false;
     }
 
@@ -1246,11 +1245,15 @@ bool ESPert_WiFi::test(int timeOut) {
 
     if (_espert->button.isLongPress()) {
       _espert->button.resetPressTime();
+      _espert->oled.println();
       return false;
     }
 
     ESP.wdtFeed();
   }
+
+  _espert->oled.println();
+  _espert->oled.println("WiFi: Failed!");
 
   _espert->println();
   _espert->println("ESPert: Connect timed out!");
@@ -1344,8 +1347,12 @@ void ESPert_WiFi::initSetupServer() {
       WiFi.begin(ESPertSSID.c_str(), ESPertPassword.c_str());
       int c = 0;
       _espert->println("ESPert: Waiting for WiFi to connect!");
-      _espert->oled.clear();
-      _espert->oled.println("Connecting...");
+      _espert->oled.println();
+      _espert->oled.print("WiFi: Connecting");
+
+      int16_t x = _espert->oled.getCursorX();
+      int16_t y = _espert->oled.getCursorY();
+      int progress = 0;
 
       while (c < 15) {
         if (WiFi.status() == WL_CONNECTED) {
@@ -1372,6 +1379,7 @@ void ESPert_WiFi::initSetupServer() {
         }
 
         _espert->print(n);
+        _espert->wifi.drawProgress(x, y, &progress);
 
         if (ESPertBoardType == ESPERT_BOARD_ESP201) {
           digitalWrite(ESPERT_PIN_LED, HIGH);
@@ -1389,6 +1397,16 @@ void ESPert_WiFi::initSetupServer() {
 
         c++;
         ESP.wdtFeed();
+      }
+
+      _espert->wifi.drawProgress(x, y, NULL);
+      _espert->oled.setCursor(x, y);
+      _espert->oled.println();
+
+      if (WiFi.status() == WL_CONNECTED) {
+        _espert->oled.println("WiFi: Success!");
+      } else {
+        _espert->oled.println("WiFi: Failed!");
       }
 
       ESP.reset();
@@ -1462,13 +1480,12 @@ void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int* progress) {
         _espert->oled.print(".");
       }
 
-      _espert->oled.update();
-
       if (++(*progress) > 3) {
         *progress = 0;
       }
     }
 
+    _espert->oled.update();
     ESP.wdtFeed();
   }
 }
