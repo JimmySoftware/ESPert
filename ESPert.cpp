@@ -1230,7 +1230,7 @@ bool ESPert_WiFi::test(int timeOut) {
       _espert->println("ESPert: No ESP auto connect info!");
       _espert->led.off();
       _espert->oled.println();
-      _espert->oled.println("WiFi: No Auto Connect!");
+      _espert->oled.println("WiFi: No Info!");
       return false;
     }
 
@@ -1491,9 +1491,6 @@ void ESPert_WiFi::drawProgress(int16_t x, int16_t y, int* progress) {
 }
 
 String ESPert_WiFi::getHTTP(const char* _host, const char* _path) {
-  int err = 0;
-  int response_code = 0;
-
   _espert->print("ESPert: Connecting to ");
   _espert->println(_host);
 
@@ -1502,10 +1499,30 @@ String ESPert_WiFi::getHTTP(const char* _host, const char* _path) {
   _espert->print(_host);
   _espert->println(_path);
 
-  String response = "";
+  JS_HttpClient http(client);
+  int err = http.get(_host, _path);
+
+  return httpResponse(&http, err);
+}
+
+String ESPert_WiFi::postHTTP(const char* _host, const char* _path) {
+  _espert->print("ESPert: Connecting to ");
+  _espert->println(_host);
+
+  WiFiClient client;
+  _espert->print("ESPert: Requesting URL: ");
+  _espert->print(_host);
+  _espert->println(_path);
 
   JS_HttpClient http(client);
-  err = http.get(_host, _path);
+  int err = http.post(_host, _path);
+
+  return httpResponse(&http, err);
+}
+
+String ESPert_WiFi::httpResponse(JS_HttpClient* http, int err) {
+  String response = "";
+
   if (err == 0) {
     _espert->print("ESPert: Got status code ");
     _espert->println(err);
@@ -1513,14 +1530,14 @@ String ESPert_WiFi::getHTTP(const char* _host, const char* _path) {
     // Usually you'd check that the response code is 200 or a
     // similar "success" code (200-299) before carrying on,
     // but we'll print out whatever response we get
-    response_code = http.responseStatusCode();
+    int response_code = http->responseStatusCode();
 
     _espert->print("ESPert: Got response code ");
     _espert->println(response_code);
 
-    err = http.skipResponseHeaders();
+    err = http->skipResponseHeaders();
     if (err >= 0) {
-      int bodyLen = http.contentLength();
+      int bodyLen = http->contentLength();
       _espert->print("ESPert: Content length is ");
       _espert->println(bodyLen);
       _espert->print("");
@@ -1533,11 +1550,11 @@ String ESPert_WiFi::getHTTP(const char* _host, const char* _path) {
       int iChunkLength = 0;
 
       // Whilst we haven't timed out & haven't reached the end of the body
-      while ((http.connected() || http.available()) && ((millis() - timeoutStart) < kNetworkTimeout)) {
-        if (http.available()) {
-          c = http.read();
+      while ((http->connected() || http->available()) && ((millis() - timeoutStart) < kNetworkTimeout)) {
+        if (http->available()) {
+          c = http->read();
 
-          if (http.isChunk) {
+          if (http->isChunk) {
             switch (iChunkState) {
               case eReadingContentLength:
                 if (isdigit(c)) {

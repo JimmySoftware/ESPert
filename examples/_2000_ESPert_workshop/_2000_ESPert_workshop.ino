@@ -137,9 +137,7 @@ void loop() {
 
     if (buttonPressed) {
       String path = "/trigger/button/with/key/" + ifttt_key;
-      espert.led.on();
-      espert.println(">>" + espert.wifi.getHTTP(host, path.c_str()) + "<<");
-      espert.led.off();
+      espert.println(">>" + espert.wifi.postHTTP(host, path.c_str()) + "<<");
     }
 
     currentSwitch2 = buttonPressed;

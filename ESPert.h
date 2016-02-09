@@ -313,6 +313,7 @@ class ESPert_WiFi
   private:
     int wifiMode;
     void drawProgress(int16_t x, int16_t y, int* progress = NULL);
+    String httpResponse(JS_HttpClient* http, int err);
 
   public:
     ESPert_WiFi();
@@ -328,6 +329,7 @@ class ESPert_WiFi
     String getAPIP();
 
     String getHTTP(const char* host, const char* path);
+    String postHTTP(const char* host, const char* path);
 };
 
 class ESPert_GroveButton: public ESPert_Button
