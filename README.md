@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/JimmySoftware/ESPert.svg?branch=master)](https://travis-ci.org/JimmySoftware/ESPert)
+
 # ESPert
 Welcome to the ESPert Arduino library for beta testers of the ESPresso Lite.
 Please proceed to follow the procedures as prescribed in the ESPresso Lite tutorial.
