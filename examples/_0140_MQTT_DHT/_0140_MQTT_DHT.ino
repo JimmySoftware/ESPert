@@ -6,7 +6,7 @@ ESPert espert;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/DHT";
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
   espert.dht.init();
 
   espert.oled.init();

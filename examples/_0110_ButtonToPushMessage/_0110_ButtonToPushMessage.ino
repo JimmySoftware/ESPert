@@ -11,7 +11,7 @@ String smartphone_key = "0000000000000000";
 bool currentSwitch = true;
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
 
   espert.oled.init();
   delay(2000);

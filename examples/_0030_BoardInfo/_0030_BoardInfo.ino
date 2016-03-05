@@ -3,7 +3,7 @@
 ESPert espert;
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
 
   espert.print("ESPert ID............: ");
   espert.println(espert.info.getId());

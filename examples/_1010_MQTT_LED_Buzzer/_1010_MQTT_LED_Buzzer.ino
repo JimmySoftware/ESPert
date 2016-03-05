@@ -54,7 +54,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
   espert.mqtt.init(mqtt_server, 1883, callback);
 
   pinMode(pinBuzzer, OUTPUT);

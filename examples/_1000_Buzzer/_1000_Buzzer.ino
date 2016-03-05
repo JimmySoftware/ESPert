@@ -4,7 +4,7 @@ ESPert espert;
 bool currentSwitch = true;
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
   espert.println("Press USER button to turn on LED and buzzer.");
   espert.buzzer.init(15);
   delay(200);

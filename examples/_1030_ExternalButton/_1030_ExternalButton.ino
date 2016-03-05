@@ -6,7 +6,7 @@ bool currentSwitch = true;
 ESPert_Button button;
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
   button.init(14);
   espert.println("Press the external button to turn on LED.");
 }

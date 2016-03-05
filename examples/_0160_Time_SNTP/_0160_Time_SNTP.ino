@@ -7,7 +7,7 @@ int timezone = 7;
 int dst = 0;
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
 
   espert.oled.init();
   delay(2000);

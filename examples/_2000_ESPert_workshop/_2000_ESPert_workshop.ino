@@ -76,7 +76,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
   delay(100);
   espert.buzzer.init(15);
   espert.dht.init();

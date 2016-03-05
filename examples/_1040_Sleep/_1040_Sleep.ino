@@ -24,7 +24,7 @@ void setup() {
   int cause = info->exccause;
 
   //system_deep_sleep_set_option(4);
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
   espert.oled.init();
   espert.oled.clear();
   espert.oled.println("Reason: " + String(reason));
