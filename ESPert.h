@@ -24,6 +24,7 @@ static const float ESPERT_LIBRARY_VERSION = 0.8f;
 #define ESPERT_BOARD_GENERIC        0
 #define ESPERT_BOARD_ESP201         1
 #define ESPERT_BOARD_ESPRESSO_LITE  2
+#define ESPERT_BOARD_ESPRESSO_LITE1 2
 #define ESPERT_BOARD_ESPRESSO_LITE2 3
 
 static int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE; // default
