@@ -8,7 +8,7 @@ int currentSwitch = true;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/Button";
 
 void setup() {
-  espert.init();
+  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
 
   espert.oled.init();
   delay(2000);
