@@ -1,5 +1,9 @@
 #include <ESPert.h>
 
+#ifndef ESPRESSO_LITE_VERSION
+  #define ESPRESSO_LITE_VERSION 2
+#endif
+
 ESPert espert;
 ESP8266WebServer *server = NULL;
 
@@ -23,7 +27,7 @@ void init_server() {
 }
 
 void setup() {
-  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
+  espert.init(ESPRESSO_LITE_VERSION);
   espert.dht.init();
 
   espert.oled.init();
