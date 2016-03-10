@@ -1,10 +1,14 @@
 #include <ESPert.h>
 
+#ifndef ESPRESSO_LITE_VERSION
+  #define ESPRESSO_LITE_VERSION 2
+#endif
+
 ESPert espert;
 bool currentSwitch = true;
 
 void setup() {
-  espert.init(ESPERT_BOARD_ESPRESSO_LITE2);
+  espert.init(ESPRESSO_LITE_VERSION);
   espert.println("Press USER button to turn on LED.");
 }
 
