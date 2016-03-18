@@ -1190,7 +1190,7 @@ void ESPert_WiFi::initSetupAP(void) {
   WiFi.disconnect();
   delay(100);
   _espert->println("ESPert: Access Point " + _espert->info.getId());
-  WiFi.softAP(_espert->info.getId().c_str(), "");
+  WiFi.softAP(_espert->info.getId().c_str());
   WiFi.mode(WIFI_AP_STA);
 
   _espert->println("ESPert: WiFi connected, softAP IP " + _espert->wifi.getAPIP());
