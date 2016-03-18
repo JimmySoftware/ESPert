@@ -25,6 +25,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
   String strPayload = String((char*)payload).substring(0, length);
   espert.println("Receive: " + strPayload);
 
+  espert.oled.clear();
+  espert.oled.println(espert.info.getId());
+  espert.oled.println();
+  espert.oled.printf("[%lu]\r\n\r\n", millis());
+  espert.oled.println("PARSE OK.");
+
+
   if (espert.json.init(strPayload)) {
     if (espert.json.containsKey("LED")) {
       String value = espert.json.get("LED");
@@ -76,6 +83,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
       espert.println("Send...: " + outString);
       espert.mqtt.publish(outTopic, outString);
     }
+  }
+  else {
+    espert.oled.clear();
+    espert.oled.println(espert.info.getId());
+    espert.oled.println();
+    espert.oled.printf("[%lu]\r\n\r\n", millis());
+    espert.oled.println("PARSE FAILED.");
   }
 }
 
@@ -159,6 +173,8 @@ void loop() {
       outString += "\"name\":\"" + String(espert.info.getId()) + "\"}";
       espert.println(outString);
       espert.mqtt.publish(outTopic, outString);
+      // espert.oled.clear();
+      // espert.oled.println(String("....") + millis());
     }
   }
 

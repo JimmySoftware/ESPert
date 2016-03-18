@@ -14,17 +14,17 @@
 #include <DHT.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include <JS_HttpClient.h>
+#include "JS_HttpClient.h"
 #include <SSD1306.h>
 #include <Adafruit_NeoPixel.h>
 #include "logo.h"
 
-static const float ESPERT_LIBRARY_VERSION = 0.8f;
+static const float ESPERT_LIBRARY_VERSION = 0.9f;
 
 #define ESPERT_BOARD_GENERIC        0
 
 /*keep it for compatibility with old sketches.*/
-#define ESPERT_BOARD_ESPRESSO_LITE  1 
+#define ESPERT_BOARD_ESPRESSO_LITE  1
 #define ESPERT_BOARD_ESPRESSO_LITE1 1
 #define ESPERT_BOARD_ESPRESSO_LITE2 2
 #define ESPERT_BOARD_ESP201         3
@@ -120,9 +120,9 @@ typedef enum {
 } tHttpState;
 
 // Number of milliseconds to wait without receiving any data before we give up
-const int kNetworkTimeout = 30 * 1000;
+const int kNetworkTimeout =   5 * 1000;
 // Number of milliseconds to wait if no data is available before trying again
-const int kNetworkDelay = 1000;
+const int kNetworkDelay = 500;
 
 class ESPert_SoftwareSerial : public Stream
 {

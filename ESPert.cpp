@@ -1219,6 +1219,10 @@ bool ESPert_WiFi::test(int timeOut) {
       _espert->println("ESPert: Connected!");
       _espert->oled.println();
       _espert->oled.println("WiFi: Success!");
+      _espert->oled.clear();
+      _espert->oled.println(_espert->info.getId());
+      _espert->oled.println();
+
       return true;
     }
 
@@ -1499,6 +1503,11 @@ String ESPert_WiFi::getHTTP(const char* _host, const char* _path) {
   _espert->print(_host);
   _espert->println(_path);
 
+  _espert->oled.clear(true);
+  _espert->oled.println("Requesting..");
+  _espert->oled.update();
+
+
   JS_HttpClient http(client);
   int err = http.get(_host, _path);
 
@@ -1513,6 +1522,11 @@ String ESPert_WiFi::postHTTP(const char* _host, const char* _path) {
   _espert->print("ESPert: Requesting URL: ");
   _espert->print(_host);
   _espert->println(_path);
+
+ _espert->oled.clear(true);
+  _espert->oled.println("Requesting..");
+  _espert->oled.update();
+
 
   JS_HttpClient http(client);
   int err = http.post(_host, _path);
@@ -1542,6 +1556,7 @@ String ESPert_WiFi::httpResponse(JS_HttpClient* http, int err) {
       _espert->println(bodyLen);
       _espert->print("");
       _espert->println("ESPert: Body returned follows");
+
 
       // Now we've got to the body, so we can print it out
       unsigned long timeoutStart = millis();
@@ -1591,6 +1606,7 @@ String ESPert_WiFi::httpResponse(JS_HttpClient* http, int err) {
           timeoutStart = millis();
         } else {
           // We haven't got any data, so let's pause to allow some to arrive
+          _espert->printf("DELAY = %lu\r\n", kNetworkDelay);
           delay(kNetworkDelay);
         }
       }
@@ -1603,7 +1619,13 @@ String ESPert_WiFi::httpResponse(JS_HttpClient* http, int err) {
     _espert->println(err);
   }
 
-  _espert->print("\r\nESPert: Response:\r\n");
+
+  _espert->oled.clear(true);
+  _espert->oled.println(response);
+  _espert->oled.update();
+
+
+  _espert->printf("\r\n[%lu] ESPert: Response:\r\n", millis());
   _espert->print(response);
   _espert->println("---\r\n");
 
