@@ -12,6 +12,8 @@ bool ESPert::checkFlashSize() {
   FlashMode_t ideMode = ESP.getFlashChipMode();
 
   Serial.println();
+  Serial.print("Firmware: ");
+  Serial.println(_espert->info.getLibraryVersion());
   Serial.printf("Flash real id....: %08X\n", ESP.getFlashChipId());
   Serial.printf("Flash real size..: %u\n\n", realSize);
 
@@ -1606,7 +1608,6 @@ String ESPert_WiFi::httpResponse(JS_HttpClient* http, int err) {
           timeoutStart = millis();
         } else {
           // We haven't got any data, so let's pause to allow some to arrive
-          _espert->printf("DELAY = %lu\r\n", kNetworkDelay);
           delay(kNetworkDelay);
         }
       }

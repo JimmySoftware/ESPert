@@ -120,7 +120,7 @@ typedef enum {
 } tHttpState;
 
 // Number of milliseconds to wait without receiving any data before we give up
-const int kNetworkTimeout =   5 * 1000;
+const int kNetworkTimeout =   3 * 1000;
 // Number of milliseconds to wait if no data is available before trying again
 const int kNetworkDelay = 500;
 
