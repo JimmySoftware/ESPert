@@ -1,3 +1,4 @@
+// #include <Arduino.h>
 #include <ESPert.h>
 
 #ifndef ESPRESSO_LITE_VERSION
@@ -5,6 +6,7 @@
 #endif
 
 ESPert espert;
+
 
 const char* mqtt_server = "mqtt.espert.io";
 
