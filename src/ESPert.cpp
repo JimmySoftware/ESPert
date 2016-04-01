@@ -33,9 +33,25 @@ bool ESPert::checkFlashSize() {
 }
 
 void ESPert::init(int type, long baud) {
+  // user-defined board.
   if (type != -1) {
     ESPertBoardType = type;
   }
+  else {
+    #ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V2
+      ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2;
+    #endif
+
+    // wait for the new release to fix this issue
+    #ifdef ARDUINO_ESP8266_espresso_lite_v2
+      ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2;
+    #endif
+
+    #ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V1
+      ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE1;
+    #endif
+  }
+
 
   if (ESPertBoardType == ESPERT_BOARD_ESPRESSO_LITE2) {
     ESPERT_PIN_LED = 2;

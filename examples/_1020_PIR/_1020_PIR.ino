@@ -42,11 +42,7 @@ int pirPin = 12; // the digital pin connected to the PIR sensor's output
 
 //#define ESPERT_BOARD_ESPRESSO_LITE2
 
-#ifdef ESPERT_BOARD_ESPRESSO_LITE2
-int ledPin = 2;  // ESPresso Lite v2.0
-#else
-int ledPin = 16; // ESPresso Lite
-#endif
+int ledPin = LED_BUILTIN;
 
 /////////////////////////////
 // SETUP

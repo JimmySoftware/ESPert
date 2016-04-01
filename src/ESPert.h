@@ -19,7 +19,7 @@
 #include <Adafruit_NeoPixel.h>
 #include "logo.h"
 
-static const float ESPERT_LIBRARY_VERSION = 0.9f;
+static const float ESPERT_LIBRARY_VERSION = 0.10f;
 
 #define ESPERT_BOARD_GENERIC        0
 
