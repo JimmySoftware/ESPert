@@ -63,6 +63,6 @@ install:
 
 
 script:
-   - python extra_ci.py
+   - python extras/extra_ci.py
    - find .
    - platformio ci --board=espresso_lite_v2 --lib="."
