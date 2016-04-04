@@ -1,8 +1,5 @@
 #include <ESPert.h>
 
-#ifndef ESPRESSO_LITE_VERSION
-  #define ESPRESSO_LITE_VERSION 2
-#endif
 
 ESPert espert;
 
@@ -58,7 +55,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup() {
-  espert.init(ESPRESSO_LITE_VERSION);
+  espert.init();
   espert.mqtt.init(mqtt_server, 1883, callback);
 
   pinMode(pinBuzzer, OUTPUT);

@@ -1,16 +1,12 @@
 #include <ESPert.h>
 
-#ifndef ESPRESSO_LITE_VERSION
-  #define ESPRESSO_LITE_VERSION 2
-#endif
-
 const char* mqtt_server = "mqtt.espert.io";
 
 ESPert espert;
 String outTopic = "ESPert/" + String(espert.info.getChipId()) + "/DHT";
 
 void setup() {
-  espert.init(ESPRESSO_LITE_VERSION);
+  espert.init();
   espert.dht.init();
 
   espert.oled.init();

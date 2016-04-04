@@ -31,3 +31,9 @@
 .pioenvs
 
 *.swp
+
+extras/tmp.clang_complete
+.gcc-flags.json
+extras/tmp/*/**
+
+.clang_complete

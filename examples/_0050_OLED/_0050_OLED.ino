@@ -1,13 +1,9 @@
 #include <ESPert.h>
 
-#ifndef ESPRESSO_LITE_VERSION
-  #define ESPRESSO_LITE_VERSION 2
-#endif
-
 ESPert espert;
 
 void setup() {
-  espert.init(ESPRESSO_LITE_VERSION);
+  espert.init();
 
   espert.oled.init();
   delay(2000);

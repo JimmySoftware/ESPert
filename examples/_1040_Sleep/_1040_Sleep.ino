@@ -1,9 +1,5 @@
 #include <ESPert.h>
 
-#ifndef ESPRESSO_LITE_VERSION
-  #define ESPRESSO_LITE_VERSION 2
-#endif
-
 // Include API-Headers
 extern "C" {
 #include "ets_sys.h"
@@ -28,7 +24,7 @@ void setup() {
   int cause = info->exccause;
 
   //system_deep_sleep_set_option(4);
-  espert.init(ESPRESSO_LITE_VERSION);
+  espert.init();
   espert.oled.init();
   espert.oled.clear();
   espert.oled.println("Reason: " + String(reason));

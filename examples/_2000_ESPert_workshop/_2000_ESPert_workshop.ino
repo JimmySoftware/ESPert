@@ -1,10 +1,8 @@
+// #include <Arduino.h>
 #include <ESPert.h>
 
-#ifndef ESPRESSO_LITE_VERSION
-  #define ESPRESSO_LITE_VERSION 2
-#endif
-
 ESPert espert;
+
 
 const char* mqtt_server = "mqtt.espert.io";
 
@@ -94,7 +92,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup() {
-  espert.init(ESPRESSO_LITE_VERSION);
+  espert.init(2);
   delay(100);
   espert.buzzer.init(15);
   espert.dht.init();

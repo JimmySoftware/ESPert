@@ -1,17 +1,13 @@
 #include <ESPert.h>
 #include <time.h>
 
-#ifndef ESPRESSO_LITE_VERSION
-  #define ESPRESSO_LITE_VERSION 2
-#endif
-
 ESPert espert;
 
 int timezone = 7;
 int dst = 0;
 
 void setup() {
-  espert.init(ESPRESSO_LITE_VERSION);
+  espert.init();
 
   espert.oled.init();
   delay(2000);
