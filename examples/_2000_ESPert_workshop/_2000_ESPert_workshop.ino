@@ -92,7 +92,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup() {
-  espert.init(2);
+  espert.init();
   delay(100);
   espert.buzzer.init(15);
   espert.dht.init();
