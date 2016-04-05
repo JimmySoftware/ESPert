@@ -17,7 +17,9 @@
 #include "JS_HttpClient.h"
 #include <SSD1306.h>
 #include <Adafruit_NeoPixel.h>
+#include <ArduinoOTA.h>
 #include "logo.h"
+#include "CMMC_OTA.h"
 
 static const float ESPERT_LIBRARY_VERSION = 0.10f;
 
@@ -421,6 +423,7 @@ class ESPert : public Print
     ESPert_WiFi           wifi;
     ESPert_Buzzer         buzzer;
     ESPERT_NeoPixel  	    neopixel;
+    CMMC_OTA              ota;
 
     ESPert();
     void init(int type = -1, long baud = 115200);

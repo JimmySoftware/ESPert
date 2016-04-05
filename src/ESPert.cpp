@@ -69,6 +69,17 @@ void ESPert::init(int type, long baud) {
   delay(1500);
 
   checkFlashSize();
+
+  Serial.printf("ESPertBoardType = %d\r\n", ESPertBoardType);
+
+  _espert->ota.on_progress([](unsigned int progress, unsigned int total){
+    Serial.printf("%u%% [%u/%u] @[%u]\r\n",
+      (progress / (total / 100)), progress, total, millis());
+  });
+
+  ArduinoOTA.setHostname(_espert->info.getId().c_str());
+  _espert->ota.init();
+
 }
 
 int ESPert::getBoardType() {
@@ -84,6 +95,7 @@ int ESPert::getButtonPin() {
 }
 
 void ESPert::loop() {
+  _espert->ota.loop();
   if (button.isLongPress()) {
     button.resetPressTime();
     println("ESPert: Long pressed!");
