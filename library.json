@@ -1,0 +1,12 @@
+{
+    "name": "ESPert",
+    "keywords": "iot, espert, espresso",
+    "description": "The library for ESPert's IoT boards for using with Arduino IDE.  Espert Pte. Ltd. is an Internet of Things (IoT) technology company that is headquartered in Singapore with subsidiary office in Thailand. We developed the ESPresso series, our own line of Arduino-compatible, Wi-Fi-enabled, development and solutions boards based on Espressif System's ESP8266 chipset.",
+    "repository":
+    {
+      "type": "git",
+      "url": "http://github.com/JimmySoftware/ESPert"
+    },
+    "frameworks": "arduino",
+    "platforms": "espressif"
+}
