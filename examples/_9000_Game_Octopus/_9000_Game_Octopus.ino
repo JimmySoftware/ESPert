@@ -11,7 +11,7 @@
 // Button 2 (USER) : Game B, Move Right
 //
 // Game A
-// Diver try to recover treasure from sunken ship raise it to their boat.
+// Divers try to recover treasure from sunken ship raise it to their boat.
 // Giant octopus tries to prevent them.
 // 1. Press button 1. Highest previous score will be displayed. Game A begins when key is released.
 // 2. Press operation button 2, and one diver goes into the water.
