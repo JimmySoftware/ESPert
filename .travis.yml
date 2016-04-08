@@ -57,6 +57,7 @@ env:
     - PLATFORMIO_CI_SRC=examples/_1040_Sleep
     - PLATFORMIO_CI_SRC=examples/_2000_ESPert_workshop
     - PLATFORMIO_CI_SRC=examples/_3001_NeoPixel
+    - PLATFORMIO_CI_SRC=examples/_9000_Game_Octopus
 install:
    - pip install -U platformio
    - platformio lib install 19 28 64 66 89 562
