@@ -44,7 +44,7 @@ int minutes = 0;
 int seconds = 0;
 
 // sound (buzzer)
-static const byte buzzerPin = 15;
+static const byte buzzerPin = 12;
 float buzzerDuration = 0.0f;
 bool isSoundEnabled = true;
 
@@ -321,6 +321,7 @@ float elapsedTime = 0.0f;
 unsigned long frameCount = 0l;
 unsigned long frameRate = 0l;
 unsigned long fpsLastFrameTime = 0l;
+unsigned long timeSyncLastFrameTime;
 bool isFPSVisibled = true;
 
 String eepromKey = "Octopus";
@@ -428,12 +429,16 @@ void update() {
 
   // frame rate
   frameCount++;
-  unsigned long fpsElapsedTime = frameTime - fpsLastFrameTime;
-
-  if (fpsElapsedTime >= 1000l) {
+  if (frameTime - fpsLastFrameTime >= 1000l) {
     frameRate = frameCount;
     frameCount = 0l;
-    fpsLastFrameTime = frameTime + (fpsElapsedTime - 1000l);
+    fpsLastFrameTime = frameTime;
+  }
+
+  // time sync
+  unsigned long t = frameTime - timeSyncLastFrameTime;
+  if (t >= 1000l) {
+    timeSyncLastFrameTime = frameTime - (t - 1000l);
     isSecondChanged = true;
 
     if (isTimeVisibled) {
@@ -1490,6 +1495,7 @@ void initGame() {
   gameType = 0;
   lastFrameTime = millis();
   fpsLastFrameTime = lastFrameTime;
+  timeSyncLastFrameTime = lastFrameTime;
 }
 
 void playSound(int index) {

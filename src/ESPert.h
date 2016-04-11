@@ -169,12 +169,13 @@ class ESPert_Button
 
   public:
     ESPert_Button();
-    void init(int pin = -1);
+    void init(int pin = -1, int mode = -1);
     long getPressTime();
     void resetPressTime();
     bool isLongPress();
     void enableLongPress();
     void disableLongPress();
+    int getPin();
     virtual bool isOn();
     virtual bool isOff();
     virtual bool get();
@@ -250,6 +251,7 @@ class ESPert_LED
     int get();
     bool isOn();
     bool isOff();
+    int getPin();
 };
 
 class ESPert_OLED : public Print
@@ -269,6 +271,7 @@ class ESPert_OLED : public Print
     int16_t getCursorY();
     void drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately = true);
     void update();
+    SSD1306* getDisplay();
 
     int cursorX;
     int cursorY;
@@ -424,6 +427,9 @@ class ESPert : public Print
     void loop();
     String macToString(const uint8_t* mac);
     bool checkFlashSize();
+    int getBoardType();
+    int getLEDPin();
+    int getButtonPin();
 
 #if ARDUINO >= 100
     virtual size_t write(uint8_t);

@@ -52,7 +52,6 @@ void ESPert::init(int type, long baud) {
     #endif
   }
 
-
   if (ESPertBoardType == ESPERT_BOARD_ESPRESSO_LITE2) {
     ESPERT_PIN_LED = 2;
     ESPERT_PIN_BUTTON = 13;
@@ -70,6 +69,18 @@ void ESPert::init(int type, long baud) {
   delay(1500);
 
   checkFlashSize();
+}
+
+int ESPert::getBoardType() {
+  return ESPertBoardType;
+}
+
+int ESPert::getLEDPin() {
+  return ESPERT_PIN_LED;
+}
+
+int ESPert::getButtonPin() {
+  return ESPERT_PIN_BUTTON;
 }
 
 void ESPert::loop() {
@@ -452,14 +463,14 @@ ESPert_Button::ESPert_Button() {
   isLongPressEnabled = true;
 }
 
-void ESPert_Button::init(int pin) {
+void ESPert_Button::init(int pin, int mode) {
   if (pin == -1) {
     buttonPin = ESPERT_PIN_BUTTON;
   } else {
     buttonPin = pin;
   }
 
-  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(buttonPin, (mode == -1) ? INPUT_PULLUP : mode);
 
   currentButtonStatus = false;
   buttonPressTime = millis();
@@ -519,6 +530,10 @@ bool ESPert_Button::get() {
   int status = digitalRead(buttonPin);
   delay(100);
   return (status == HIGH) ? true : false;
+}
+
+int ESPert_Button::getPin() {
+  return buttonPin;
 }
 
 // ****************************************
@@ -704,6 +719,10 @@ bool ESPert_LED::isOff() {
   return (get() == 0) ? true : false;
 }
 
+int ESPert_LED::getPin() {
+  return ledPin;
+}
+
 // ****************************************
 // OLED class
 // ****************************************
@@ -780,7 +799,6 @@ void ESPert_OLED::write(uint8_t c)
 #endif
 }
 
-
 void ESPert_OLED::clear(bool clearImmediately) {
   if (display) {
     display->clear();
@@ -821,6 +839,7 @@ int16_t ESPert_OLED::getCursorY() {
 
 void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately) {
   if (display) {
+    display->setColor(color);
     display->drawBitmap(x, y, w, h, (const char*)bitmap);
 
     if (drawImmediately) {
@@ -835,7 +854,9 @@ void ESPert_OLED::update() {
   }
 }
 
-
+SSD1306* ESPert_OLED::getDisplay() {
+  return display;
+}
 
 // ****************************************
 // MQTT2 class
