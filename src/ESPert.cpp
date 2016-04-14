@@ -642,7 +642,7 @@ bool ESPert_JSON::init(String payload) {
   bool success = false;
   unsigned int length = payload.length();
 
-  if (json = (char*)malloc(length)) {
+  if (json = (char*)malloc(length+1)) {
     memset(json, '\0', length);
     memcpy(json, payload.c_str(), length);
     root = &jsonBuffer.parseObject(json);
