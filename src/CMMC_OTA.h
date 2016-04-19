@@ -7,24 +7,6 @@
 #include <ArduinoOTA.h>
 #include <ESP8266mDNS.h>
 
-//#define CMMC_OTA_DEBUG
-
-// #ifdef CMMC_OTA_DEBUG
-//     #define CMMC_OTA_PRINTER Serial
-//     #define CMMC_OTA_PRINT(...) { CMMC_OTA_PRINTER.print(__VA_ARGS__); }
-//     #define CMMC_OTA_PRINTLN(...) { CMMC_OTA_PRINTER.println(__VA_ARGS__); }
-// #else
-//     #define CMMC_OTA_PRINT(...) { }
-//     #define CMMC_OTA_PRINTLN(...) { }
-// #endif
-
-// typedef std::function<void(const void*)> wifi_callback_t;
-
-// #define OTA_CALLBACK(callback) void (*callback)()
-// #define OTA_CALLBACK_PROGRESS(callback)  void (*callback)(unsigned int, unsigned int)
-// #define OTA_CALLBACK_ERROR(callback)  void (*callback)(ota_error_t)
-//
-
 class CMMC_OTA {
   private:
     bool _initialised = false;
@@ -84,17 +66,6 @@ class CMMC_OTA {
     }
 
     CMMC_OTA();
-    //
-    // static CMMC_OTA& instance()
-    // {
-    //   static CMMC_OTA *s_instance = NULL;
-    //   Serial.printf("addr: %x\r\n", s_instance);
-    //   if (s_instance == NULL) {
-    //     s_instance = new CMMC_OTA;
-    //   }
-    //   Serial.printf("addr: %x\r\n", s_instance);
-    //   return *s_instance;
-    // }
 
     ~CMMC_OTA();
 
@@ -105,6 +76,5 @@ class CMMC_OTA {
     }
 };
 
-// CMMC_OTA* CMMC_OTA::s_instance = NULL;
 
 #endif /* CMMC_OTA */
