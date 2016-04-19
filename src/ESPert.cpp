@@ -95,7 +95,9 @@ int ESPert::getButtonPin() {
 }
 
 void ESPert::loop() {
-  _espert->ota.loop();
+  if (_espert->ota.enabled()) {
+    _espert->ota.loop();
+  }
   if (button.isLongPress()) {
     button.resetPressTime();
     println("ESPert: Long pressed!");
@@ -1839,10 +1841,8 @@ uint32_t ESPERT_NeoPixel::Wheel(byte WheelPos) {
   return this->_neopixel->Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
 
-
 ESPert_OTA* ESPert_OTA::init() {
     static ESPert_OTA* s_instance = this;
-    Serial.println("INITIAL ESPert OTA");
     if (!_initialised)  {
       ArduinoOTA.onStart([]() {
         if (s_instance->_user_on_start_callback != NULL) {
@@ -1879,6 +1879,10 @@ void ESPert_OTA::loop() {
   if (_initialised) {
     ArduinoOTA.handle();
   }
+}
+
+bool ESPert_OTA::enabled() {
+  return _initialised;
 }
 
 void ESPert_OTA::on_start(OTA_CALLBACK(fn)) {

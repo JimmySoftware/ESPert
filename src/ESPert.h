@@ -414,13 +414,15 @@ class ESPert_OTA {
     OTA_CALLBACK(_user_on_end_callback) = NULL;
     OTA_CALLBACK_ERROR(_user_on_error_callback) = NULL;
     OTA_CALLBACK_PROGRESS(_user_on_progress_callback) = NULL;
-    ESPert_OTA* init();
+
     void loop();
     void on_start(OTA_CALLBACK(fn));
     void on_end(OTA_CALLBACK(fn));
     void on_progress(OTA_CALLBACK_PROGRESS(fn));
     void on_error(OTA_CALLBACK_ERROR(fn));
 
+    ESPert_OTA* init();
+    bool enabled();
     ESPert_OTA();
     ~ESPert_OTA();
 
