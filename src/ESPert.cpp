@@ -1838,3 +1838,71 @@ uint32_t ESPERT_NeoPixel::Wheel(byte WheelPos) {
   WheelPos -= 170;
   return this->_neopixel->Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
+
+
+ESPert_OTA* ESPert_OTA::init() {
+    static ESPert_OTA* s_instance = this;
+    Serial.println("INITIAL ESPert OTA");
+    if (!_initialised)  {
+      ArduinoOTA.onStart([]() {
+        if (s_instance->_user_on_start_callback != NULL) {
+          s_instance->_user_on_start_callback();
+        }
+      });
+
+      ArduinoOTA.onEnd([]() {
+        if (s_instance->_user_on_end_callback != NULL) {
+          s_instance->_user_on_end_callback();
+        }
+      });
+
+      ArduinoOTA.onProgress([&](unsigned int progress, unsigned int total) {
+        if (s_instance->_user_on_progress_callback != NULL) {
+          s_instance->_user_on_progress_callback(progress, total);
+        }
+      });
+
+      ArduinoOTA.onError([](ota_error_t error) {
+        if (s_instance->_user_on_error_callback != NULL) {
+          s_instance->_user_on_error_callback(error);
+        }
+      });
+
+      ArduinoOTA.begin();
+      _initialised = true;
+    }
+    return s_instance;
+}
+
+
+void ESPert_OTA::loop() {
+  if (_initialised) {
+    ArduinoOTA.handle();
+  }
+}
+
+void ESPert_OTA::on_start(OTA_CALLBACK(fn)) {
+  _user_on_start_callback = fn;
+}
+
+void ESPert_OTA::on_end(OTA_CALLBACK(fn)) {
+  _user_on_end_callback = fn;
+}
+
+void ESPert_OTA::on_progress(OTA_CALLBACK_PROGRESS(fn)) {
+  _user_on_progress_callback = fn;
+}
+
+void ESPert_OTA::on_error(OTA_CALLBACK_ERROR(fn)) {
+  _user_on_error_callback = fn;
+}
+
+
+ESPert_OTA::ESPert_OTA() {
+
+}
+
+
+ESPert_OTA::~ESPert_OTA() {
+
+}

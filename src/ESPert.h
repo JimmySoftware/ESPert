@@ -1,6 +1,7 @@
 #ifndef __ESPERT_h__
 #define __ESPERT_h__
 
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
@@ -19,7 +20,6 @@
 #include <Adafruit_NeoPixel.h>
 #include <ArduinoOTA.h>
 #include "logo.h"
-#include "CMMC_OTA.h"
 
 static const float ESPERT_LIBRARY_VERSION = 0.10f;
 
@@ -406,6 +406,27 @@ class ESPERT_NeoPixel // WS2812
     uint32_t Wheel(byte WheelPos);
 };
 
+class ESPert_OTA {
+  private:
+    bool _initialised = false;
+  public:
+    OTA_CALLBACK(_user_on_start_callback) = NULL;
+    OTA_CALLBACK(_user_on_end_callback) = NULL;
+    OTA_CALLBACK_ERROR(_user_on_error_callback) = NULL;
+    OTA_CALLBACK_PROGRESS(_user_on_progress_callback) = NULL;
+    ESPert_OTA* init();
+    void loop();
+    void on_start(OTA_CALLBACK(fn));
+    void on_end(OTA_CALLBACK(fn));
+    void on_progress(OTA_CALLBACK_PROGRESS(fn));
+    void on_error(OTA_CALLBACK_ERROR(fn));
+
+    ESPert_OTA();
+    ~ESPert_OTA();
+
+};
+
+
 class ESPert : public Print
 {
   public:
@@ -423,7 +444,7 @@ class ESPert : public Print
     ESPert_WiFi           wifi;
     ESPert_Buzzer         buzzer;
     ESPERT_NeoPixel  	    neopixel;
-    CMMC_OTA              ota;
+    ESPert_OTA              ota;
 
     ESPert();
     void init(int type = -1, long baud = 115200);
