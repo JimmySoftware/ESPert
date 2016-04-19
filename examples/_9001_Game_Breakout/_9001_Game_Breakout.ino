@@ -26,7 +26,7 @@ static const int numberOfColumns = 11;
 const int levelTable[numberOfLevels][numberOfRows][numberOfColumns] = {
   { // level 01
     {10, 10, 10, 10, 10, 12, 10, 10, 10, 10, 10},
-    {11, 10, 10, 10, 10, 10, 10, 10, 10, 10, 13},
+    {10, 10, 11, 10, 10, 10, 10, 10, 13, 10, 10},
     {00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00},
     {00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00},
     {00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00}
@@ -388,8 +388,6 @@ void addBall(int value);
 void deleteItem(int i);
 
 void setup() {
-  int gamepadButton1Pin = 14;
-  int gamepadButton2Pin = 1;
   espert.init();
   espert.oled.init();
   espert.buzzer.init(buzzerPin);
