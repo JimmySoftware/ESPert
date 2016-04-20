@@ -38,18 +38,18 @@ void ESPert::init(int type, long baud) {
     ESPertBoardType = type;
   }
   else {
-    #ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V2
-      ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2;
-    #endif
+#ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V2
+    ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2;
+#endif
 
     // wait for the new release to fix this issue
-    #ifdef ARDUINO_ESP8266_espresso_lite_v2
-      ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2;
-    #endif
+#ifdef ARDUINO_ESP8266_espresso_lite_v2
+    ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2;
+#endif
 
-    #ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V1
-      ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE1;
-    #endif
+#ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V1
+    ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE1;
+#endif
   }
 
   if (ESPertBoardType == ESPERT_BOARD_ESPRESSO_LITE2) {
@@ -72,9 +72,9 @@ void ESPert::init(int type, long baud) {
 
   Serial.printf("ESPertBoardType = %d\r\n", ESPertBoardType);
 
-  _espert->ota.on_progress([](unsigned int progress, unsigned int total){
+  _espert->ota.on_progress([](unsigned int progress, unsigned int total) {
     Serial.printf("%u%% [%u/%u] @[%u]\r\n",
-      (progress / (total / 100)), progress, total, millis());
+                  (progress / (total / 100)), progress, total, millis());
   });
 
   ArduinoOTA.setHostname(_espert->info.getId().c_str());
@@ -656,8 +656,8 @@ bool ESPert_JSON::init(String payload) {
   bool success = false;
   unsigned int length = payload.length();
 
-  if (json = (char*)malloc(length+1)) {
-    memset(json, '\0', length);
+  if (json = (char*)malloc(length + 1)) {
+    memset(json, '\0', length + 1);
     memcpy(json, payload.c_str(), length);
     root = &jsonBuffer.parseObject(json);
 
@@ -796,8 +796,7 @@ void ESPert_OLED::write(uint8_t c)
     update();
     cursorX = 0;
     return 1;
-  }
-  else if (c == 10) {
+  } else if (c == 10) {
     cursorY += charHeight;
     return 1;
   }
@@ -838,6 +837,12 @@ void ESPert_OLED::setTextColor(uint16_t c) {
   }
 }
 
+void ESPert_OLED::setColor(uint16_t c) {
+  if (display) {
+    display->setColor(c);
+  }
+}
+
 void ESPert_OLED::setCursor(int16_t x, int16_t y) {
   cursorX = x;
   cursorY = y;
@@ -854,6 +859,16 @@ int16_t ESPert_OLED::getCursorY() {
 void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately) {
   if (display) {
     display->setColor(color);
+    display->drawBitmap(x, y, w, h, (const char*)bitmap);
+
+    if (drawImmediately) {
+      display->display();
+    }
+  }
+}
+
+void ESPert_OLED::drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap, bool drawImmediately) {
+  if (display) {
     display->drawBitmap(x, y, w, h, (const char*)bitmap);
 
     if (drawImmediately) {
@@ -1560,7 +1575,6 @@ String ESPert_WiFi::getHTTP(const char* _host, const char* _path) {
   _espert->oled.println("Requesting..");
   _espert->oled.update();
 
-
   JS_HttpClient http(client);
   int err = http.get(_host, _path);
 
@@ -1576,10 +1590,9 @@ String ESPert_WiFi::postHTTP(const char* _host, const char* _path) {
   _espert->print(_host);
   _espert->println(_path);
 
- _espert->oled.clear(true);
+  _espert->oled.clear(true);
   _espert->oled.println("Requesting..");
   _espert->oled.update();
-
 
   JS_HttpClient http(client);
   int err = http.post(_host, _path);
@@ -1609,7 +1622,6 @@ String ESPert_WiFi::httpResponse(JS_HttpClient* http, int err) {
       _espert->println(bodyLen);
       _espert->print("");
       _espert->println("ESPert: Body returned follows");
-
 
       // Now we've got to the body, so we can print it out
       unsigned long timeoutStart = millis();
@@ -1671,11 +1683,9 @@ String ESPert_WiFi::httpResponse(JS_HttpClient* http, int err) {
     _espert->println(err);
   }
 
-
   _espert->oled.clear(true);
   _espert->oled.println(response);
   _espert->oled.update();
-
 
   _espert->printf("\r\n[%lu] ESPert: Response:\r\n", millis());
   _espert->print(response);
@@ -1744,14 +1754,14 @@ void ESPert_Buzzer::init(int pin) {
   this->pin = pin;
 }
 
-void ESPert_Buzzer::beep(int freeq, int duration) {
-  analogWrite(pin, freeq); // Almost any value can be used except 0 and 255 experiment to get the best tone
+void ESPert_Buzzer::beep(int freq, unsigned long duration) {
+  analogWrite(pin, freq); // Almost any value can be used except 0 and 255 experiment to get the best tone
   delay(duration);         // wait for a delayms ms
   analogWrite(pin, 0);     // 0 turns it off
 }
 
-void ESPert_Buzzer::on(int freeq) {
-  analogWrite(pin, freeq); // Almost any value can be used except 0 and 255 experiment to get the best tone
+void ESPert_Buzzer::on(int freq) {
+  analogWrite(pin, freq); // Almost any value can be used except 0 and 255 experiment to get the best tone
 }
 
 void ESPert_Buzzer::off() {
@@ -1842,38 +1852,37 @@ uint32_t ESPERT_NeoPixel::Wheel(byte WheelPos) {
 }
 
 ESPert_OTA* ESPert_OTA::init() {
-    static ESPert_OTA* s_instance = this;
-    if (!_initialised)  {
-      ArduinoOTA.onStart([]() {
-        if (s_instance->_user_on_start_callback != NULL) {
-          s_instance->_user_on_start_callback();
-        }
-      });
+  static ESPert_OTA* s_instance = this;
+  if (!_initialised)  {
+    ArduinoOTA.onStart([]() {
+      if (s_instance->_user_on_start_callback != NULL) {
+        s_instance->_user_on_start_callback();
+      }
+    });
 
-      ArduinoOTA.onEnd([]() {
-        if (s_instance->_user_on_end_callback != NULL) {
-          s_instance->_user_on_end_callback();
-        }
-      });
+    ArduinoOTA.onEnd([]() {
+      if (s_instance->_user_on_end_callback != NULL) {
+        s_instance->_user_on_end_callback();
+      }
+    });
 
-      ArduinoOTA.onProgress([&](unsigned int progress, unsigned int total) {
-        if (s_instance->_user_on_progress_callback != NULL) {
-          s_instance->_user_on_progress_callback(progress, total);
-        }
-      });
+    ArduinoOTA.onProgress([&](unsigned int progress, unsigned int total) {
+      if (s_instance->_user_on_progress_callback != NULL) {
+        s_instance->_user_on_progress_callback(progress, total);
+      }
+    });
 
-      ArduinoOTA.onError([](ota_error_t error) {
-        if (s_instance->_user_on_error_callback != NULL) {
-          s_instance->_user_on_error_callback(error);
-        }
-      });
+    ArduinoOTA.onError([](ota_error_t error) {
+      if (s_instance->_user_on_error_callback != NULL) {
+        s_instance->_user_on_error_callback(error);
+      }
+    });
 
-      ArduinoOTA.begin();
-      _initialised = true;
-    }
-    return s_instance;
+    ArduinoOTA.begin();
+    _initialised = true;
+  }
+  return s_instance;
 }
-
 
 void ESPert_OTA::loop() {
   if (_initialised) {

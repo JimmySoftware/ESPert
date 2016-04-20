@@ -257,7 +257,7 @@ unsigned long frameCount = 0l;
 unsigned long frameRate = 0l;
 unsigned long fpsLastFrameTime = 0l;
 unsigned long timeSyncLastFrameTime;
-bool isFPSVisibled = true;
+bool isFPSVisibled = false;
 
 String eepromKey = "Octopus";
 short eepromAddress = 512 - eepromKey.length() - 6;
@@ -469,80 +469,80 @@ void update() {
 
 void render() {
   espert.oled.clear(false);
-  espert.oled.setTextColor(ESPERT_WHITE);
-  espert.oled.drawBitmap(0, 0, backgroundBitmap, 128, 64, ESPERT_WHITE, false);
+  espert.oled.setColor(ESPERT_WHITE);
+  espert.oled.drawBitmap(0, 0, 128, 64, backgroundBitmap, false);
 
   if (isGameTypeVisibled) {
-    espert.oled.drawBitmap(0, 56, gameTypeImage, 32, 8, ESPERT_WHITE, false);
+    espert.oled.drawBitmap(0, 56, 32, 8, gameTypeImage, false);
   }
 
-  espert.oled.setTextColor(ESPERT_BLACK);
+  espert.oled.setColor(ESPERT_BLACK);
 
   for (int i = 0; i < 6; i++) {
     if (isDiverStepVisibled[i]) {
-      espert.oled.drawBitmap(diverStepPosition[i].x, diverStepPosition[i].y, diverStepImage[i], 16, 16, ESPERT_BLACK, false);
+      espert.oled.drawBitmap(diverStepPosition[i].x, diverStepPosition[i].y, 16, 16, diverStepImage[i], false);
     }
 
     for (int j = 0; j < 5; j++) {
       if (i < maxTentacleCount[j] && isTentacleVisibled[j][i]) {
-        espert.oled.drawBitmap(tentaclePosition[j][i].x, tentaclePosition[j][i].y, tentacleBitmap[j][i], 8, 8, ESPERT_BLACK, false);
+        espert.oled.drawBitmap(tentaclePosition[j][i].x, tentaclePosition[j][i].y, 8, 8, tentacleBitmap[j][i], false);
       }
     }
 
     if (i < 2) {
       if (isRemainderVisibled[i]) {
-        espert.oled.drawBitmap(remainderPosition[i].x, remainderPosition[i].y, remainderBitmap, 16, 16, ESPERT_BLACK, false);
+        espert.oled.drawBitmap(remainderPosition[i].x, remainderPosition[i].y, 16, 16, remainderBitmap, false);
       }
 
       if (isHourDigitVisibled[i]) {
-        espert.oled.drawBitmap(hourDigitPosition[i].x, hourDigitPosition[i].y, hourDigitImage[i], 8, 8, ESPERT_BLACK, false);
+        espert.oled.drawBitmap(hourDigitPosition[i].x, hourDigitPosition[i].y, 8, 8, hourDigitImage[i], false);
       }
 
       if (isMinuteDigitVisibled[i]) {
-        espert.oled.drawBitmap(minuteDigitPosition[i].x, minuteDigitPosition[i].y, minuteDigitImage[i], 8, 8, ESPERT_BLACK, false);
+        espert.oled.drawBitmap(minuteDigitPosition[i].x, minuteDigitPosition[i].y, 8, 8, minuteDigitImage[i], false);
       }
 
       if (isFPSVisibled) {
         if (i == 0) {
-          espert.oled.drawBitmap(101, 4, fpsBitmap, 16, 8, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(101, 4, 16, 8, fpsBitmap, false);
         }
 
         if (isFPSDigitVisibled[i]) {
-          espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, fpsDigitImage[i], 8, 8, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, 8, 8, fpsDigitImage[i], false);
         }
       }
 
       if (i == 0) {
         if (isColonVisibled) {
-          espert.oled.drawBitmap(74, 1, colonBitmap, 8, 8, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(74, 1, 8, 8, colonBitmap, false);
         }
 
         if (isAMVisibled) {
-          espert.oled.drawBitmap(52, 1, amBitmap, 16, 8, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(52, 1, 16, 8, amBitmap, false);
         }
 
         if (isPMVisibled) {
-          espert.oled.drawBitmap(52, 5, pmBitmap, 16, 8, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(52, 5, 16, 8, pmBitmap, false);
         }
 
         if (isMissDiverVisibled) {
-          espert.oled.drawBitmap(missDiverPosition.x, missDiverPosition.y, missDiverBitmap, 16, 16, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(missDiverPosition.x, missDiverPosition.y, 16, 16, missDiverBitmap, false);
         }
 
         if (isMissArmVisibled) {
-          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, missArmImage, 8, 8, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, 8, 8, missArmImage, false);
         }
 
         if (isMissLegsVisibled) {
-          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, missLegsImage, 16, 16, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, 16, 16, missLegsImage, false);
         }
 
         if (isShowResetScreen) {
-          espert.oled.drawBitmap(diverStepPosition[0].x, diverStepPosition[0].y, onTheBoatBitmap[0], 16, 16, ESPERT_BLACK, false);
-          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, diverBitmap[11], 16, 16, ESPERT_BLACK, false);
-          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, diverBitmap[15], 16, 16, ESPERT_BLACK, false);
-          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, missArmBitmap[0], 8, 8, ESPERT_BLACK, false);
-          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, missLegsBitmap[0], 16, 16, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(diverStepPosition[0].x, diverStepPosition[0].y, 16, 16, onTheBoatBitmap[0], false);
+          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, 16, 16, diverBitmap[11], false);
+          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, 16, 16, diverBitmap[15], false);
+          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, 8, 8, missArmBitmap[0], false);
+          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, 16, 16, missLegsBitmap[0], false);
         }
       }
     }

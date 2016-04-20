@@ -547,19 +547,19 @@ void update() {
 
 void render() {
   espert.oled.clear(false);
-  espert.oled.setTextColor(ESPERT_WHITE);
+  espert.oled.setColor(ESPERT_WHITE);
 
   switch (gameMode) {
     case GAME_MODE_TITLE:
     case GAME_MODE_TITLE_BLINK:
-      espert.oled.drawBitmap(0, 0, titleBitmap, 128, 64, ESPERT_WHITE, false);
+      espert.oled.drawBitmap(0, 0, 128, 64, titleBitmap, false);
 
       for (int i = 0; i < 4; i++) {
-        espert.oled.drawBitmap(56 + (i * 4), 43, highScoreDigitImage[i], 8, 8, ESPERT_WHITE, false);
+        espert.oled.drawBitmap(56 + (i * 4), 43, 8, 8, highScoreDigitImage[i], false);
       }
 
       if (gameMode == GAME_MODE_TITLE || (gameMode == GAME_MODE_TITLE_BLINK && ((int)titleBlinkTime % 500 < 250))) {
-        espert.oled.drawBitmap(0, 0, breakoutBitmap, 128, 32, ESPERT_WHITE, false);
+        espert.oled.drawBitmap(0, 0, 128, 32, breakoutBitmap, false);
       }
       break;
 
@@ -572,76 +572,76 @@ void render() {
         for (int row = 0; row < rowCount; row++) {
           for (int column = 0; column < numberOfColumns; column++) {
             if (brickImage[row][column]) {
-              espert.oled.drawBitmap(brickPosition[row][column].x, brickPosition[row][column].y, brickImage[row][column], 16, 8, ESPERT_WHITE, false);
+              espert.oled.drawBitmap(brickPosition[row][column].x, brickPosition[row][column].y, 16, 8, brickImage[row][column], false);
             }
           }
         }
 
         for (int i = 0; i < numberOfBullets; i++) {
           if (bulletImage[i]) {
-            espert.oled.drawBitmap(bulletPosition[i].x, bulletPosition[i].y, bulletImage[i], 8, 8, ESPERT_WHITE, false);
+            espert.oled.drawBitmap(bulletPosition[i].x, bulletPosition[i].y, 8, 8, bulletImage[i], false);
           }
         }
       }
 
       for (int i = 0; i < numberOfItems; i++) {
         if (itemImage[i]) {
-          espert.oled.drawBitmap(itemPosition[i].x, itemPosition[i].y, itemImage[i], 8, 8, ESPERT_WHITE, false);
+          espert.oled.drawBitmap(itemPosition[i].x, itemPosition[i].y, 8, 8, itemImage[i], false);
         }
       }
 
-      espert.oled.drawBitmap(paddlePosition.x - 16, paddlePosition.y, paddleBitmap[(int)paddleType], 32, 8, ESPERT_WHITE, false);
+      espert.oled.drawBitmap(paddlePosition.x - 16, paddlePosition.y, 32, 8, paddleBitmap[(int)paddleType], false);
 
       if (((gameMode == GAME_MODE_GET_READY && isReadyToPlay && miss) || (gameMode == GAME_MODE_GET_READY && !miss) || gameMode == GAME_MODE_PLAY || gameMode == GAME_MODE_LEVEL_CLEARED) || (gameMode == GAME_MODE_MISS && ((int)missTime % 500) < 250)) {
         for (int ball = 0; ball < numberOfBalls; ball++) {
           if (ballDirection[ball][0] != 0 && ballDirection[ball][1] != 0) {
-            espert.oled.drawBitmap(ballPosition[ball][0], ballPosition[ball][1], ballBitmap, 8, 8, ESPERT_WHITE, false);
+            espert.oled.drawBitmap(ballPosition[ball][0], ballPosition[ball][1], 8, 8, ballBitmap, false);
           }
         }
       }
 
       // status bar
-      espert.oled.drawBitmap(0, 0, statusBarBackgroundBitmap, 128, 8, ESPERT_WHITE, false);
+      espert.oled.drawBitmap(0, 0, 128, 8, statusBarBackgroundBitmap, false);
 
       if (gameMode == GAME_MODE_GET_READY) {
         if (getReadyTime <= 1500.0f) {
-          espert.oled.drawBitmap(48, infoY, getReadyBitmap, 32, 8, ESPERT_WHITE, false);
+          espert.oled.drawBitmap(48, infoY, 32, 8, getReadyBitmap, false);
         }
         else if (getReadyTime >= 2000.0f && getReadyTime <= 2500.0f) {
-          espert.oled.drawBitmap(62, infoY, numberBitmap[3], 8, 8, ESPERT_WHITE, false);
+          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[3], false);
         }
         else if (getReadyTime >= 3000.0f && getReadyTime <= 3500.0f) {
-          espert.oled.drawBitmap(62, infoY, numberBitmap[2], 8, 8, ESPERT_WHITE, false);
+          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[2], false);
         }
         else if (getReadyTime >= 4000.0f && getReadyTime <= 4500.0f) {
-          espert.oled.drawBitmap(62, infoY, numberBitmap[1], 8, 8, ESPERT_WHITE, false);
+          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[1], false);
         }
         else if (getReadyTime >= 5000.0f) {
-          espert.oled.drawBitmap(60, infoY, goBitmap, 8, 8, ESPERT_WHITE, false);
+          espert.oled.drawBitmap(60, infoY, 8, 8, goBitmap, false);
         }
       } else if (gameMode == GAME_MODE_GAME_OVER && ((int)gameOverTimeOut % 500) < 250) {
-        espert.oled.drawBitmap(48, infoY, gameOverBitmap, 32, 8, ESPERT_WHITE, false);
+        espert.oled.drawBitmap(48, infoY, 32, 8, gameOverBitmap, false);
       } else if (gameMode == GAME_MODE_LEVEL_CLEARED && ((int)levelClearedTime % 500) < 250) {
-        espert.oled.drawBitmap(37, infoY, levelClearedBitmap, 64, 8, ESPERT_WHITE, false);
+        espert.oled.drawBitmap(37, infoY, 64, 8, levelClearedBitmap, false);
       }
 
-      espert.oled.drawBitmap(0, 0, wallBitmap, 8, 64, ESPERT_WHITE, false);
-      espert.oled.drawBitmap(127, 0, wallBitmap, 8, 64, ESPERT_WHITE, false);
-      espert.oled.setTextColor(ESPERT_BLACK);
-      espert.oled.drawBitmap(0, 0, isFPSVisibled ? statusBarBitmap[1] : statusBarBitmap[0], 128, 8, ESPERT_BLACK, false);
+      espert.oled.drawBitmap(0, 0, 8, 64, wallBitmap, false);
+      espert.oled.drawBitmap(127, 0, 8, 64, wallBitmap, false);
+      espert.oled.setColor(ESPERT_BLACK);
+      espert.oled.drawBitmap(0, 0, 128, 8, isFPSVisibled ? statusBarBitmap[1] : statusBarBitmap[0], false);
 
       if (((int)addBallBlinkTime % 200) < 100) {
-        espert.oled.drawBitmap(ballDigitPosition.x - (isFPSVisibled ? 14 : 0), ballDigitPosition.y, ballDigitImage, 8, 8, ESPERT_BLACK, false);
+        espert.oled.drawBitmap(ballDigitPosition.x - (isFPSVisibled ? 14 : 0), ballDigitPosition.y, 8, 8, ballDigitImage, false);
       }
 
       for (int i = 0; i < 4; i++) {
-        espert.oled.drawBitmap(112 - (isFPSVisibled ? 26 : 0) + (i * 4), 1, scoreDigitImage[i], 8, 8, ESPERT_BLACK, false);
+        espert.oled.drawBitmap(112 - (isFPSVisibled ? 26 : 0) + (i * 4), 1, 8, 8, scoreDigitImage[i], false);
 
         if (i < 2) {
-          espert.oled.drawBitmap(levelDigitPosition[i].x, levelDigitPosition[i].y, levelDigitImage[i], 8, 8, ESPERT_BLACK, false);
+          espert.oled.drawBitmap(levelDigitPosition[i].x, levelDigitPosition[i].y, 8, 8, levelDigitImage[i], false);
 
           if (isFPSVisibled && isFPSDigitVisibled[i]) {
-            espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, fpsDigitImage[i], 8, 8, ESPERT_BLACK, false);
+            espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, 8, 8, fpsDigitImage[i], false);
           }
         }
       }

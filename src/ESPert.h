@@ -32,7 +32,7 @@ static const float ESPERT_LIBRARY_VERSION = 0.10f;
 #define ESPERT_BOARD_ESPRESSO_LITE2 2
 #define ESPERT_BOARD_ESP201         3
 
-static int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE; // default
+static int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2; // default
 
 #ifdef ESPERT_DEBUG
 
@@ -269,10 +269,12 @@ class ESPert_OLED : public Print
     void clear(bool clearImmediately = true);
     void setTextSize(uint8_t s);
     void setTextColor(uint16_t c);
+    void setColor(uint16_t c);
     void setCursor(int16_t x, int16_t y);
     int16_t getCursorX();
     int16_t getCursorY();
     void drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately = true);
+    void drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap, bool drawImmediately = true);
     void update();
     SSD1306* getDisplay();
 
@@ -382,7 +384,7 @@ class ESPert_Buzzer
 
   public:
     void init(int pin = -1);
-    void beep(int freeq, int duration);
+    void beep(int freq, unsigned long duration);
     void on(int freq);
     void off();
 };
