@@ -6,6 +6,9 @@ env = DefaultEnvironment()
 # print env.Dump()
 # print ARGUMENTS
 
+if not os.path.exists("extras/tmp"):
+    os.makedirs("extras/tmp")
+
 if not os.path.exists("extras/tmp/ESPert"):
     os.makedirs("extras/tmp/ESPert")
 

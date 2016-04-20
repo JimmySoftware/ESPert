@@ -69,6 +69,17 @@ void ESPert::init(int type, long baud) {
   delay(1500);
 
   checkFlashSize();
+
+  Serial.printf("ESPertBoardType = %d\r\n", ESPertBoardType);
+
+  _espert->ota.on_progress([](unsigned int progress, unsigned int total){
+    Serial.printf("%u%% [%u/%u] @[%u]\r\n",
+      (progress / (total / 100)), progress, total, millis());
+  });
+
+  ArduinoOTA.setHostname(_espert->info.getId().c_str());
+  _espert->ota.init();
+
 }
 
 int ESPert::getBoardType() {
@@ -84,6 +95,9 @@ int ESPert::getButtonPin() {
 }
 
 void ESPert::loop() {
+  if (_espert->ota.enabled()) {
+    _espert->ota.loop();
+  }
   if (button.isLongPress()) {
     button.resetPressTime();
     println("ESPert: Long pressed!");
@@ -1825,4 +1839,74 @@ uint32_t ESPERT_NeoPixel::Wheel(byte WheelPos) {
 
   WheelPos -= 170;
   return this->_neopixel->Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+ESPert_OTA* ESPert_OTA::init() {
+    static ESPert_OTA* s_instance = this;
+    if (!_initialised)  {
+      ArduinoOTA.onStart([]() {
+        if (s_instance->_user_on_start_callback != NULL) {
+          s_instance->_user_on_start_callback();
+        }
+      });
+
+      ArduinoOTA.onEnd([]() {
+        if (s_instance->_user_on_end_callback != NULL) {
+          s_instance->_user_on_end_callback();
+        }
+      });
+
+      ArduinoOTA.onProgress([&](unsigned int progress, unsigned int total) {
+        if (s_instance->_user_on_progress_callback != NULL) {
+          s_instance->_user_on_progress_callback(progress, total);
+        }
+      });
+
+      ArduinoOTA.onError([](ota_error_t error) {
+        if (s_instance->_user_on_error_callback != NULL) {
+          s_instance->_user_on_error_callback(error);
+        }
+      });
+
+      ArduinoOTA.begin();
+      _initialised = true;
+    }
+    return s_instance;
+}
+
+
+void ESPert_OTA::loop() {
+  if (_initialised) {
+    ArduinoOTA.handle();
+  }
+}
+
+bool ESPert_OTA::enabled() {
+  return _initialised;
+}
+
+void ESPert_OTA::on_start(OTA_CALLBACK(fn)) {
+  _user_on_start_callback = fn;
+}
+
+void ESPert_OTA::on_end(OTA_CALLBACK(fn)) {
+  _user_on_end_callback = fn;
+}
+
+void ESPert_OTA::on_progress(OTA_CALLBACK_PROGRESS(fn)) {
+  _user_on_progress_callback = fn;
+}
+
+void ESPert_OTA::on_error(OTA_CALLBACK_ERROR(fn)) {
+  _user_on_error_callback = fn;
+}
+
+
+ESPert_OTA::ESPert_OTA() {
+
+}
+
+
+ESPert_OTA::~ESPert_OTA() {
+
 }
