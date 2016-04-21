@@ -12,10 +12,9 @@ void setup() {
   espert.ota.init();
 
   // config callbacks
-  // ESPert_OTA ota = *(espert.ota.init());
-  // ota.on_progress([](unsigned int progress, unsigned int total){
-  //   Serial.printf("_CALLBACK_ Progress: %u/%u\r\n", progress,  total);
-  // });
+  espert.ota.on_progress([](unsigned int progress, unsigned int total){
+    Serial.printf("_CALLBACK_ Progress: %u/%u\r\n", progress,  total);
+  });
   delay(2000);
 
   espert.println("Press USER button to turn on LED.");
