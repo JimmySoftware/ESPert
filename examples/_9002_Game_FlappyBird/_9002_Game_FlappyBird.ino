@@ -604,7 +604,7 @@ Point birdSize = {16, 16};
 static const float birdAnimationSpeed = 8.0f / 1000.0f;
 float birdFrame = 0.0f;
 float birdDegrees = 0.0f;
-int birdFiestFrame = 1; // change this value to 0 to enable birdFrame 0
+int birdFirstFrame = 1; // change this value to 0 to enable birdFrame 0
 int birdFrameDirection = 1;
 bool isDropping = false;
 float heightRatio = 0.0f;
@@ -1244,15 +1244,15 @@ void updateBirdAnimation(bool rotate) {
         if (!isDropping) {
           isDropping = true;
           dropPosition = birdPosition.y;
-          heightRatio = (numberOfDegrees - birdFiestFrame) / (landPosition - (birdSize.y * 0.25f) - birdPosition.y);
+          heightRatio = (numberOfDegrees - birdFirstFrame) / (landPosition - (birdSize.y * 0.25f) - birdPosition.y);
         }
 
-        birdDegrees = birdFiestFrame + ((birdPosition.y - dropPosition) * heightRatio);
+        birdDegrees = birdFirstFrame + ((birdPosition.y - dropPosition) * heightRatio);
       } else {
         birdDegrees -= speed * 2.0f;
       }
 
-      birdDegrees = constrain(birdDegrees, birdFiestFrame, numberOfDegrees - 1);
+      birdDegrees = constrain(birdDegrees, birdFirstFrame, numberOfDegrees - 1);
     }
 
     if (birdDegrees == numberOfDegrees - 1) {
