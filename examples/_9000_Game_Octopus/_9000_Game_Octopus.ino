@@ -10,6 +10,12 @@
 // Button 1 (FLASH): Game A, Move Left
 // Button 2 (USER) : Game B, Move Right
 //
+// Gamepad
+// Left or Up: Move Left
+// Right or Down: Move Right
+// A: Game A
+// B: Game A
+//
 // Game A
 // Divers try to recover treasure from sunken ship raise it to their boat.
 // Giant octopus tries to prevent them.
@@ -40,17 +46,35 @@ int hours = 0;
 int minutes = 0;
 int seconds = 0;
 
-// button pin
+// button
+typedef enum {
+  BUTTON_NONE = -1,
+  BUTTON_LEFT,
+  BUTTON_RIGHT,
+  BUTTON_UP,
+  BUTTON_DOWN,
+  BUTTON_A,
+  BUTTON_B
+} ButtonType;
+
+static const byte numberOfButtons = 6;
+int gamepadPin[numberOfButtons] = {12, 13, 14, 2, 0, A0}; // (left, right, up, down, a, b)
+bool isGamepadEnabled = true;
+
 #ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V1
-byte buttonPin[2] = {0, 2};
+int buttonPin[numberOfButtons] = {0, 2, -1, -1, -1, -1}; // USER, FLASH
 #else
-byte buttonPin[2] = {0, 13};
+int buttonPin[numberOfButtons] = {0, 13, -1, -1, -1, -1}; // GPIO0, GPIO13
 #endif
-byte gamepadPin[2] = {14, 1};
-bool isGamepadEnabled = false;
+
+ESPert_Button button[numberOfButtons];
+static const byte maxButtonDelay = 50; // milliseconds
+float buttonDelay = maxButtonDelay;
+bool isButtonPressed[numberOfButtons] = {false};
+int pressedButton = BUTTON_NONE;
 
 // sound (buzzer)
-static const byte buzzerPin = 12;
+static const int buzzerPin = isGamepadEnabled ? 15 : 12;
 float buzzerDuration = 0.0f;
 bool isSoundEnabled = true;
 
@@ -205,10 +229,16 @@ const uint8_t diverBitmap[17][32] PROGMEM {
   {0x7F, 0x3F, 0x1F, 0x0F, 0x4F, 0x9F, 0xA3, 0x01, 0x10, 0x04, 0xA0, 0xC9, 0xE3, 0xFF, 0xFF, 0xFF, 0xF8, 0xF8, 0xE4, 0xE7, 0xE6, 0xF2, 0xF8, 0xF0, 0x80, 0x9E, 0x9F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}  // diver16.png
 };
 
-struct Point {
+typedef enum {
+  GAME_NONE,
+  GAME_A,
+  GAME_B
+} GameType;
+
+typedef struct {
   byte x;
   byte y;
-};
+} Point;
 
 Point tentaclePosition[5][5] = {
   {{45, 23}, {37, 23}, {29, 21}, { 0,  0}, { 0,  0}},
@@ -269,12 +299,12 @@ static const int diverSpeed = 300;
 int gameSpeed = 50;
 bool isSecondChanged = false;
 unsigned long gameLoopTime = 0l;
-byte gameType = 0;
+byte gameType = GAME_NONE;
 bool isBagVisibled = false;
 short score = 0;
 byte miss = 0;
 bool isPlaying = false;
-byte add3Score = 0;
+byte addBonusScore = 0;
 short secondCount = 0;
 bool isScoreVisibled = false;
 byte onTheBoatCount = 10;
@@ -299,45 +329,39 @@ byte tentacle = 0;
 byte diverPositionIndex = 0;
 bool isNextTentacle = false;
 
-ESPert_Button button[2];
-static const byte maxButtonDelay = 50; // milliseconds
-float buttonDelay = maxButtonDelay;
-bool isButtonPressed[2] = {false};
-byte pressedButton = 0;
-
 // function prototypes
-void update();
-void render();
-void initGame();
-void resetGame();
-void startGame();
-void tryAgain();
-void demoScreen();
-void autoMove();
-void showGameType(byte gameTypeValue);
-void showScore(short value);
-void showHighScore(byte gameTypeValue);
-void showFPS(short value);
-void showTime();
-void showResetScreen(byte gameTypeValue = 0);
-void checkSpeed();
-void checkDiver();
-void checkMiss();
-void checkHighScore();
-bool checkShowHighScoreTime();
-void checkTentacle();
-void checkClearMiss();
-void checkCaught();
-void checkButtons();
-void gotCaught();
-void check3Score();
 void addScore();
+void autoMove();
+void autoPlayScreen();
+void checkButtons();
+void checkBonusScore();
+void checkCaught();
+void checkClearMiss();
+void checkDiver();
+void checkHighScore();
+void checkMiss();
+bool checkShowHighScoreTime();
+void checkSpeed();
+void checkTentacle();
+void gotCaught();
+void initGame();
+String intToString(int value, int length, String prefixChar = "0");
 void moveLeft();
 void moveRight();
-void readHighScores();
-void writeHighScores();
-String intToString(int value, int length, String prefixChar = "0");
 void playSound(int index);
+void readHighScore();
+void render();
+void resetGame();
+void showFPS(short value);
+void showGameType(byte gameTypeValue);
+void showHighScore(byte gameTypeValue);
+void showResetScreen(byte gameTypeValue = 0);
+void showScore(short value);
+void showTime();
+void startGame();
+void tryAgain();
+void update();
+void writeHighScore();
 
 void setup() {
   espert.init();
@@ -345,12 +369,14 @@ void setup() {
   espert.buzzer.init(buzzerPin);
   randomSeed(analogRead(0));
 
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < numberOfButtons; i++) {
     if (isGamepadEnabled) {
       buttonPin[i] = gamepadPin[i];
     }
 
-    button[i].init(buttonPin[i]);
+    if (buttonPin[i] != -1) {
+      button[i].init(buttonPin[i], INPUT_PULLUP);
+    }
   }
 
   initGame();
@@ -359,661 +385,6 @@ void setup() {
 void loop() {
   update();
   render();
-}
-
-void update() {
-  // game time
-  unsigned long frameTime = millis();
-  elapsedTime = frameTime - lastFrameTime;
-  lastFrameTime = frameTime;
-
-  // frame rate
-  frameCount++;
-  if (frameTime - fpsLastFrameTime >= 1000l) {
-    frameRate = frameCount;
-    frameCount = 0l;
-    fpsLastFrameTime = frameTime;
-  }
-
-  // time sync
-  unsigned long t = frameTime - timeSyncLastFrameTime;
-  if (t >= 1000l) {
-    timeSyncLastFrameTime = frameTime - (t - 1000l);
-    isSecondChanged = true;
-
-    if (isTimeVisibled) {
-      if (++seconds > 59) {
-        seconds = 0;
-
-        if (++minutes > 59) {
-          minutes = 0;
-
-          if (++hours > 23) {
-            hours = 0;
-          }
-        }
-      }
-    }
-
-    if (isFPSVisibled) {
-      showFPS(frameRate);
-    }
-  }
-
-  // button
-  buttonDelay += elapsedTime;
-
-  if (buttonDelay >= maxButtonDelay) {
-    buttonDelay = 0.0f;
-    checkButtons();
-  }
-
-  // sound
-  if (buzzerDuration > 0.0f) {
-    buzzerDuration -= elapsedTime;
-
-    if (buzzerDuration <= 0.0f) {
-      buzzerDuration = 0.0f;
-      espert.buzzer.off();
-    }
-  }
-
-  // game loop
-  if (!isShowResetScreen) {
-    gameLoopTime += elapsedTime;
-
-    if (gameLoopTime >= gameSpeed) {
-      gameLoopTime -= gameSpeed;
-
-      if (!isPlaying) {
-        demoScreen();
-      } else {
-        if (isSecondChanged) {
-          isSecondChanged = false;
-
-          if (miss == 4 && ++secondCount > 3) {
-            showHighScoreTime = 0;
-            resetGame();
-            tryAgain();
-          }
-
-          if (caught == 0 && clearMissCount == 0 && onTheBoatCount > 0) {
-            secondCount++;
-
-            if (--onTheBoatCount == 0) {
-              moveRight();
-              secondCount = 0;
-            }
-          }
-        }
-
-        if (caught == 0) {
-          check3Score();
-
-          if (clearMissCount == 0) {
-            checkTentacle();
-
-            if (diverPosition > 5) {
-              moveRight();
-            }
-          } else {
-            checkClearMiss();
-          }
-        } else if (caught > 0) {
-          checkCaught();
-        }
-      }
-    }
-  }
-}
-
-void render() {
-  espert.oled.clear(false);
-  espert.oled.setColor(ESPERT_WHITE);
-  espert.oled.drawBitmap(0, 0, 128, 64, backgroundBitmap, false);
-
-  if (isGameTypeVisibled) {
-    espert.oled.drawBitmap(0, 56, 32, 8, gameTypeImage, false);
-  }
-
-  espert.oled.setColor(ESPERT_BLACK);
-
-  for (int i = 0; i < 6; i++) {
-    if (isDiverStepVisibled[i]) {
-      espert.oled.drawBitmap(diverStepPosition[i].x, diverStepPosition[i].y, 16, 16, diverStepImage[i], false);
-    }
-
-    for (int j = 0; j < 5; j++) {
-      if (i < maxTentacleCount[j] && isTentacleVisibled[j][i]) {
-        espert.oled.drawBitmap(tentaclePosition[j][i].x, tentaclePosition[j][i].y, 8, 8, tentacleBitmap[j][i], false);
-      }
-    }
-
-    if (i < 2) {
-      if (isRemainderVisibled[i]) {
-        espert.oled.drawBitmap(remainderPosition[i].x, remainderPosition[i].y, 16, 16, remainderBitmap, false);
-      }
-
-      if (isHourDigitVisibled[i]) {
-        espert.oled.drawBitmap(hourDigitPosition[i].x, hourDigitPosition[i].y, 8, 8, hourDigitImage[i], false);
-      }
-
-      if (isMinuteDigitVisibled[i]) {
-        espert.oled.drawBitmap(minuteDigitPosition[i].x, minuteDigitPosition[i].y, 8, 8, minuteDigitImage[i], false);
-      }
-
-      if (isFPSVisibled) {
-        if (i == 0) {
-          espert.oled.drawBitmap(101, 4, 16, 8, fpsBitmap, false);
-        }
-
-        if (isFPSDigitVisibled[i]) {
-          espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, 8, 8, fpsDigitImage[i], false);
-        }
-      }
-
-      if (i == 0) {
-        if (isColonVisibled) {
-          espert.oled.drawBitmap(74, 1, 8, 8, colonBitmap, false);
-        }
-
-        if (isAMVisibled) {
-          espert.oled.drawBitmap(52, 1, 16, 8, amBitmap, false);
-        }
-
-        if (isPMVisibled) {
-          espert.oled.drawBitmap(52, 5, 16, 8, pmBitmap, false);
-        }
-
-        if (isMissDiverVisibled) {
-          espert.oled.drawBitmap(missDiverPosition.x, missDiverPosition.y, 16, 16, missDiverBitmap, false);
-        }
-
-        if (isMissArmVisibled) {
-          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, 8, 8, missArmImage, false);
-        }
-
-        if (isMissLegsVisibled) {
-          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, 16, 16, missLegsImage, false);
-        }
-
-        if (isShowResetScreen) {
-          espert.oled.drawBitmap(diverStepPosition[0].x, diverStepPosition[0].y, 16, 16, onTheBoatBitmap[0], false);
-          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, 16, 16, diverBitmap[11], false);
-          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, 16, 16, diverBitmap[15], false);
-          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, 8, 8, missArmBitmap[0], false);
-          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, 16, 16, missLegsBitmap[0], false);
-        }
-      }
-    }
-  }
-
-  espert.oled.update();
-}
-
-bool checkShowHighScoreTime() {
-  bool finished = true;
-
-  if (showHighScoreTime > 0 && pressedButton != 0) {
-    if (++showHighScoreTime > 3) {
-      showHighScoreTime = 0;
-      isGameTypeVisibled = false;
-    } else {
-      showHighScore(pressedButton);
-      finished = false;
-    }
-  }
-
-  return finished;
-}
-
-void showResetScreen(byte gameTypeValue) {
-  isShowResetScreen = true;
-
-  if (gameTypeValue == 1 || gameTypeValue == 2) {
-    isGameTypeVisibled = true;
-    gameTypeImage = gameTypeBitmap[gameTypeValue - 1];
-    showScore((gameTypeValue == 1) ? gameAHighScore : gameBHighScore);
-  } else {
-    isGameTypeVisibled = false;
-    isAMVisibled = true;
-    isPMVisibled = false;
-    isColonVisibled = true;
-    memset(&isHourDigitVisibled, true, sizeof(isHourDigitVisibled));
-    memset(&isMinuteDigitVisibled, true, sizeof(isMinuteDigitVisibled));
-
-    for (int i = 0; i < 2; i++) {
-      hourDigitImage[i] = numberBitmap[i + 1];
-      minuteDigitImage[i] = numberBitmap[0];
-    }
-
-    if (isFPSVisibled) {
-      showFPS(0);
-    }
-  }
-
-  memset(&isDiverStepVisibled, true, sizeof(isDiverStepVisibled));
-  memset(&isRemainderVisibled, true, sizeof(isRemainderVisibled));
-  memset(&isTentacleVisibled, true, sizeof(isTentacleVisibled));
-  isMissDiverVisibled = true;
-  isMissArmVisibled = true;
-  isMissLegsVisibled = true;
-  missArmImage = missArmBitmap[1];
-  missLegsImage = missLegsBitmap[1];
-
-  for (int i = 0; i < 6; i++) {
-    diverStepImage[i] = (i == 0) ? onTheBoatBitmap[1] : diverBitmap[((i - 1) * 2) + 1];
-  }
-}
-
-void startGame() {
-  if (!isPlaying) {
-    gameLoopTime = 0l;
-    showGameType(gameType);
-    isMissDiverVisibled = false;
-    isMissArmVisibled = false;
-    isMissLegsVisibled = false;
-    isPlaying = true;
-    isBagVisibled = false;
-    clearMissCount = 0;
-    isRandomTentacle = false;
-    memset(&isEndOfTentacle, false, sizeof(isEndOfTentacle));
-    memset(&tentacleDirection, 0, sizeof(tentacleDirection));
-
-    for (int i = 0; i < 5; i++) {
-      isDiverStepVisibled[i + 1] = false;
-
-      if (tentacleCount[i] > 0) {
-        for (int j = tentacleCount[i] - 1; j >= 0; j--) {
-          isTentacleVisibled[i][j] = false;
-        }
-      }
-
-      tentacleCount[i] = 0;
-    }
-
-    currentTentacle = 0;
-    add3Score = 0;
-    diverPosition = 0;
-    onTheBoatCount = 10;
-    secondCount = 0;
-    score = 0;
-    caught = 0;
-    showScore(score);
-    checkSpeed();
-    miss = 0;
-    checkDiver();
-    checkMiss();
-  }
-}
-
-void showGameType(byte gameTypeValue) {
-  isGameTypeVisibled = false;
-
-  if (gameTypeValue == 1 || gameTypeValue == 2) {
-    isGameTypeVisibled = true;
-    gameTypeImage = gameTypeBitmap[gameTypeValue - 1];
-  }
-}
-
-void showScore(short value) {
-  String scoreString = intToString(value, 3, "0");
-  isScoreVisibled = true;
-  isAMVisibled = false;
-  isPMVisibled = false;
-  isColonVisibled = false;
-  isHourDigitVisibled[0] = false;
-
-  if (scoreString.charAt(0) != '0') {
-    hourDigitImage[1] = numberBitmap[scoreString.charAt(0) - '0'];
-    isHourDigitVisibled[1] = true;
-    minuteDigitImage[0] = numberBitmap[scoreString.charAt(1) - '0'];
-    isMinuteDigitVisibled[0] = true;
-  } else {
-    isHourDigitVisibled[1] = false;
-
-    if (scoreString.charAt(1) != '0') {
-      minuteDigitImage[0] = numberBitmap[scoreString.charAt(1) - '0'];
-      isMinuteDigitVisibled[0] = true;
-    } else {
-      isMinuteDigitVisibled[0] = false;
-    }
-  }
-
-  minuteDigitImage[1] = numberBitmap[scoreString.charAt(2) - '0'];
-  isMinuteDigitVisibled[1] = true;
-}
-
-void showHighScore(byte gameTypeValue) {
-  isGameTypeVisibled = true;
-  gameTypeImage = gameTypeBitmap[gameTypeValue - 1];
-  showScore((gameTypeValue == 1) ? gameAHighScore : gameBHighScore);
-}
-
-void showFPS(short value) {
-  value = constrain(value, 0, 99);
-  String fpsString = intToString(value, 2, "0");
-  memset(&isFPSDigitVisibled, isFPSVisibled, sizeof(isFPSDigitVisibled));
-
-  for (int i = 0; i < 2; i++) {
-    fpsDigitImage[i] = numberBitmap[fpsString.charAt(i) - '0'];
-  }
-
-  if (value > 0 && value < 10) {
-    isFPSDigitVisibled[0] = false;
-  }
-}
-
-void showTime() {
-  if (checkShowHighScoreTime()) {
-    showHighScoreTime = 0;
-
-    if (isTimeVisibled) {
-      isColonVisibled = (seconds % 2 == 0) ? true : false;
-      isAMVisibled = (hours < 12) ? true : false;
-      isPMVisibled = !isAMVisibled;
-      int h = hours % 12;
-      String hh = intToString((h == 0) ? 12 : h, 2, "0");
-      String mm = intToString(minutes, 2, "0");
-      memset(&isHourDigitVisibled, true, sizeof(isHourDigitVisibled));
-      memset(&isMinuteDigitVisibled, true, sizeof(isMinuteDigitVisibled));
-
-      for (int i = 0; i < 2; i++) {
-        hourDigitImage[i] = numberBitmap[hh.charAt(i) - '0'];
-        minuteDigitImage[i] = numberBitmap[mm.charAt(i) - '0'];
-      }
-
-      if (hh.charAt(0) == '0') {
-        isHourDigitVisibled[0] = false;
-      }
-    }
-  }
-}
-
-String intToString(int value, int length, String prefixChar) {
-  String stringValue = String(value);
-  String prefix = "";
-
-  for (int i = 0; i < length - stringValue.length(); i++) {
-    prefix += prefixChar;
-  }
-
-  return prefix + stringValue;
-}
-
-void checkSpeed() {
-  if (caught > 0 || add3Score > 0 || clearMissCount > 0) {
-    gameSpeed = diverSpeed;
-  } else {
-    gameSpeed = 50;
-
-    switch (gameType) {
-      case 1: // game A
-        gameSpeed = gameASpeed;
-
-        if (gameSpeed > 30 && ((score >= 70 && score < 100) || (score >= 160 && score < 190) || (score >= 250 && score < 280) || (score >= 330 && score < 360) || (score >= 430 && score < 460) || (score >= 520 && score < 560) || (score >= 610 && score < 650) || (score >= 710 && score < 740) || (score >= 810 && score < 830) || (score >= 930 && score < 970))) {
-          gameSpeed -= 30;
-        } else if (gameSpeed > 60 && ((score >= 190 && score < 200) || (score >= 280 && score < 300) || (score >= 560 && score < 600) || (score >= 650 && score < 690) || (score >= 740 && score < 780))) {
-          gameSpeed -= 60;
-        } else if (gameSpeed > 50 && ((score >= 360 && score < 390) || (score >= 460 && score < 490) || (score >= 830 && score < 870))) {
-          gameSpeed -= 50;
-        } else if (gameSpeed > 80 && ((score >= 390 && score < 400) || (score >= 490 && score < 500) || (score >= 690 && score < 700) || (score >= 780 && score < 800) || (score >= 870 && score < 900) || (score >= 970 && score <= 999))) {
-          gameSpeed -= 80;
-        }
-        break;
-
-      case 2: // game B
-        gameSpeed = gameBSpeed;
-
-        if (gameSpeed > 30 && ((score >= 30 && score < 70) || (score >= 130 && score < 160) || (score >= 220 && score < 250) || (score >= 330 && score < 360) || (score >= 430 && score < 460) || (score >= 520 && score < 560) || (score >= 610 && score < 650) || (score >= 710 && score < 740) || (score >= 830 && score < 870) || (score >= 930 && score < 970))) {
-          gameSpeed -= 30;
-        } else if (gameSpeed > 60 && ((score >= 70 && score < 100) || (score >= 160 && score < 190) || (score >= 250 && score < 280) || (score >= 360 && score < 390) || (score >= 460 && score < 490) || (score >= 560 && score < 600) || (score >= 650 && score < 690) || (score >= 740 && score < 780) || (score >= 870 && score < 900))) {
-          gameSpeed -= 60;
-        } else if (gameSpeed > 80 && ((score >= 190 && score < 200) || (score >= 280 && score < 300) || (score >= 390 && score < 400) || (score >= 490 && score < 500) || (score >= 690 && score < 700) || (score >= 780 && score < 800) || (score >= 970 && score < 999))) {
-          gameSpeed -= 80;
-        }
-        break;
-    }
-
-    if (gameSpeed < 0) {
-      gameSpeed = 0;
-    }
-  }
-}
-
-void checkMiss() {
-  if (miss <= 2) {
-    diverStepImage[0] = onTheBoatBitmap[0];
-    isDiverStepVisibled[0] = true;
-  }
-
-  switch (miss) {
-    case 0:
-      isRemainderVisibled[0] = true;
-      isRemainderVisibled[1] = true;
-      break;
-
-    case 1:
-      isRemainderVisibled[0] = false;
-      isRemainderVisibled[1] = true;
-      tryAgain();
-      break;
-
-    case 2:
-      isRemainderVisibled[0] = false;
-      isRemainderVisibled[1] = false;
-      tryAgain();
-      break;
-
-    default:
-      checkHighScore();
-
-      if (isPlaying) {
-        caught = 7;
-        miss = 4;
-        secondCount = 0;
-      } else {
-        if (caught == 0) {
-          isMissDiverVisibled = false;
-          isMissArmVisibled = false;
-          isMissLegsVisibled = false;
-          isBagVisibled = false;
-          onTheBoatCount = 10;
-          secondCount = 0;
-          isRemainderVisibled[0] = true;
-          isRemainderVisibled[1] = true;
-          diverStepImage[0] = onTheBoatBitmap[0];
-          isDiverStepVisibled[0] = true;
-        }
-
-        add3Score = 0;
-        miss = 0;
-        tryAgain();
-      }
-      break;
-  }
-}
-
-void checkDiver() {
-  if (miss == 1 || miss == 2) {
-    isRemainderVisibled[1] = false;
-    diverStepImage[0] = onTheBoatBitmap[0];
-    isDiverStepVisibled[0] = true;
-  }
-}
-
-void tryAgain() {
-  for (int i = 1; i < 6; i++) {
-    isDiverStepVisibled[i] = false;
-  }
-
-  diverPosition = 0;
-}
-
-void checkHighScore() {
-  if (gameType == 1 && score > gameAHighScore) {
-    gameAHighScore = score;
-    writeHighScores();
-  } else if (gameType == 2 && score > gameBHighScore) {
-    gameBHighScore = score;
-    writeHighScores();
-  }
-}
-
-void check3Score() {
-  if (add3Score > 0) {
-    onTheBoatCount = 10;
-
-    if (--add3Score > 0) {
-      addScore();
-
-      if (clearMissCount == 0) {
-        playSound(1);
-      }
-    } else {
-      isBagVisibled = false;
-      checkSpeed();
-    }
-
-    if (add3Score == 2) {
-      diverStepImage[diverPosition] = onTheBoatBitmap[1];
-    } else if (add3Score == 3 || add3Score <= 1) {
-      diverStepImage[diverPosition] = onTheBoatBitmap[0];
-    }
-  }
-}
-
-void checkTentacle() {
-  bool isPlaySound = false;
-  tentacle = 0;
-  diverPositionIndex = 0;
-  isNextTentacle = false;
-
-  if ((currentTentacle > 1 && ((tentacleCount[currentTentacle] == 0 && random(5) <= 2) || tentacleCount[currentTentacle] > 0)) || (currentTentacle <= 1 && ((tentacleCount[0] == 0 && tentacleCount[1] == 0 && random(5) <= 2) || (tentacleCount[currentTentacle] > 0)))) {
-    isNextTentacle = false;
-
-    if (currentTentacle == 0 || currentTentacle == 1) {
-      if (tentacleCount[0] == 0 && tentacleCount[1] == 0 && isRandomTentacle) {
-        currentTentacle = random(2);
-        isRandomTentacle = false;;
-      } else if (tentacleCount[0] == 0 && tentacleCount[1] == 0 && !isRandomTentacle) {
-        isNextTentacle = true;
-        isRandomTentacle = true;
-      }
-    }
-
-    tentacle = currentTentacle;
-
-    if (isNextTentacle) {
-      isPlaySound = (add3Score == 0) ? true : false;
-    } else if (!isNextTentacle && tentacleDirection[tentacle] == 0) {
-      isTentacleVisibled[tentacle][tentacleCount[tentacle]] = true;
-      isPlaySound = (add3Score == 0) ? true : false;
-
-      if (++tentacleCount[tentacle] == maxTentacleCount[tentacle]) {
-        isEndOfTentacle[tentacle] = true;
-        diverPositionIndex = (diverPosition > 5) ? 5 : diverPosition;
-
-        if (diverPositionIndex == tentacle + 1) {
-          diverStepImage[diverPositionIndex] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
-          isPlaySound = false;
-          gotCaught();
-        }
-
-        tentacleDirection[tentacle] = 1;
-      } else {
-        isEndOfTentacle[tentacle] = false;
-      }
-    } else if (!isNextTentacle) {
-      if (gameType == 2 && tentacleDirection[tentacle] == 1 && tentacleCount[tentacle] == 1 && random(10) == 0) {
-        tentacleDirection[tentacle] = 0;
-        isPlaySound = (add3Score == 0) ? true : false;
-      } else {
-        tentacleCount[tentacle]--;
-        isTentacleVisibled[tentacle][tentacleCount[tentacle]] = false;
-        isEndOfTentacle[tentacle] = false;
-        isPlaySound = (add3Score == 0) ? true : false;
-
-        if (tentacle < 2) {
-          isRandomTentacle = false;
-        }
-
-        if (tentacleCount[tentacle] == 0) {
-          tentacleDirection[tentacle] = 0;
-        }
-      }
-    }
-  } else {
-    tentacle = currentTentacle;
-    isPlaySound = (add3Score == 0) ? true : false;
-  }
-
-  if (isPlaySound) {
-    playSound(0);
-  }
-
-  currentTentacle = tentacle + 1;
-
-  if (currentTentacle > 4) {
-    currentTentacle = 0;
-  }
-}
-
-void moveLeft() {
-  if (diverPosition >= 1) {
-    if (diverPosition > 5) {
-      diverPosition = 5;
-    }
-
-    if (diverPosition > 1) {
-      isDiverStepVisibled[diverPosition] = false;
-      diverPosition--;
-      diverStepImage[diverPosition] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
-      isDiverStepVisibled[diverPosition] = true;
-
-      if (isEndOfTentacle[diverPosition - 1]) {
-        gotCaught();
-      }
-    } else if (isBagVisibled && clearMissCount == 0) {
-      isDiverStepVisibled[diverPosition] = false;
-      diverPosition--;
-      add3Score = 4;
-      diverStepImage[diverPosition] = onTheBoatBitmap[1];
-      isDiverStepVisibled[diverPosition] = true;
-    }
-  }
-}
-
-void moveRight() {
-  onTheBoatCount = 0;
-
-  if (diverPosition < 5) {
-    isDiverStepVisibled[diverPosition] = false;
-    diverPosition++;
-    diverStepImage[diverPosition] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
-    isDiverStepVisibled[diverPosition] = true;
-
-    if (isEndOfTentacle[diverPosition - 1]) {
-      gotCaught();
-    }
-  } else if (diverPosition < 10 && clearMissCount == 0) {
-    if (++diverPosition == 9) {
-      diverPosition = 5;
-    } else if (diverPosition == 8) {
-      isBagVisibled = true;
-
-      if (isPlaying && caught == 0) {
-        playSound(1);
-        addScore();
-      }
-    }
-
-    diverStepImage[5] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
-
-    if (isEndOfTentacle[5 - 1]) {
-      gotCaught();
-    }
-  }
 }
 
 void addScore() {
@@ -1040,6 +411,115 @@ void addScore() {
     }
 
     checkSpeed();
+  }
+}
+
+void autoMove() {
+  if (!isBagVisibled || (isBagVisibled && diverPosition == 8) || (isBagVisibled && diverPosition == 0 && addBonusScore == 1)) {
+    if (isBagVisibled && diverPosition == 0 && addBonusScore == 1) {
+      addBonusScore = 0;
+      isBagVisibled = false;
+    }
+
+    moveRight();
+  } else {
+    if (addBonusScore > 1) {
+      checkBonusScore();
+    } else {
+      moveLeft();
+    }
+  }
+
+  for (int i = 0; i < 4; i++) {
+    checkTentacle();
+  }
+}
+
+void autoPlayScreen() {
+  if (isSecondChanged) {
+    isSecondChanged = false;
+    showTime();
+
+    if (caught > 0) {
+      checkCaught();
+    } else {
+      autoMove();
+    }
+  }
+}
+
+void checkButtons() {
+  for (int i = 0; i < numberOfButtons; i++) {
+    if (buttonPin[i] != -1) {
+      bool isPressed = false;
+
+      if (buttonPin[i] == A0) {
+        isPressed = (analogRead(buttonPin[i]) < 512) ? true : false;
+      } else {
+        isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
+      }
+
+      if (isPressed != isButtonPressed[i]) {
+        isButtonPressed[i] = isPressed;
+
+        if (isPressed) {
+          if (pressedButton == BUTTON_NONE && (addBonusScore == 0 || !isPlaying)) {
+            pressedButton = i;
+
+            if (!isPlaying || (isPlaying && (miss == 4 || (caught == 0 && ((i == BUTTON_LEFT || i == BUTTON_UP) || ((i == BUTTON_RIGHT || i == BUTTON_DOWN) && ((clearMissCount > 0 && diverPosition > 0 && diverPosition <= 5) || (clearMissCount == 0 && diverPosition <= 5)))))))) {
+              if (!isPlaying || miss == 4) {
+                showHighScoreTime = 1;
+                if (((isGamepadEnabled && (i == BUTTON_A || i == BUTTON_B)) || (!isGamepadEnabled && (i == BUTTON_LEFT || i == BUTTON_RIGHT))) && (!isPlaying || (isPlaying && miss == 4))) {
+                  showHighScore((pressedButton == BUTTON_A || pressedButton == BUTTON_LEFT) ? GAME_A : GAME_B);
+                }
+              } else if (i == BUTTON_LEFT || i == BUTTON_UP) {
+                moveLeft();
+              } else if (i == BUTTON_RIGHT || i == BUTTON_DOWN) {
+                moveRight();
+              }
+            }
+          }
+        } else {
+          if (showHighScoreTime > 0) {
+            showHighScoreTime = 0;
+            isGameTypeVisibled = false;
+
+            if (((isGamepadEnabled && (i == BUTTON_A || i == BUTTON_B)) || (!isGamepadEnabled && (i == BUTTON_LEFT || i == BUTTON_RIGHT))) && pressedButton == i) {
+              resetGame();
+              gameType = (i == BUTTON_A || i == BUTTON_LEFT) ? GAME_A : GAME_B;
+              startGame();
+            }
+          }
+
+          pressedButton = BUTTON_NONE;
+        }
+
+        break;
+      }
+    }
+  }
+}
+
+void checkBonusScore() {
+  if (addBonusScore > 0) {
+    onTheBoatCount = 10;
+
+    if (--addBonusScore > 0) {
+      addScore();
+
+      if (clearMissCount == 0) {
+        playSound(1);
+      }
+    } else {
+      isBagVisibled = false;
+      checkSpeed();
+    }
+
+    if (addBonusScore == 2) {
+      diverStepImage[diverPosition] = onTheBoatBitmap[1];
+    } else if (addBonusScore == 3 || addBonusScore <= 1) {
+      diverStepImage[diverPosition] = onTheBoatBitmap[0];
+    }
   }
 }
 
@@ -1129,125 +609,206 @@ void checkClearMiss() {
   }
 }
 
-void demoScreen() {
-  if (isSecondChanged) {
-    isSecondChanged = false;
-    showTime();
-
-    if (caught > 0) {
-      checkCaught();
-    } else {
-      autoMove();
-    }
+void checkDiver() {
+  if (miss == 1 || miss == 2) {
+    isRemainderVisibled[1] = false;
+    diverStepImage[0] = onTheBoatBitmap[0];
+    isDiverStepVisibled[0] = true;
   }
 }
 
-void autoMove() {
-  if (!isBagVisibled || (isBagVisibled && diverPosition == 8) || (isBagVisibled && diverPosition == 0 && add3Score == 1)) {
-    if (isBagVisibled && diverPosition == 0 && add3Score == 1) {
-      add3Score = 0;
-      isBagVisibled = false;
-    }
-
-    moveRight();
-  } else {
-    if (add3Score > 1) {
-      check3Score();
-    } else {
-      moveLeft();
-    }
-  }
-
-  for (int i = 0; i < 4; i++) {
-    checkTentacle();
+void checkHighScore() {
+  if (gameType == GAME_A && score > gameAHighScore) {
+    gameAHighScore = score;
+    writeHighScore();
+  } else if (gameType == GAME_B && score > gameBHighScore) {
+    gameBHighScore = score;
+    writeHighScore();
   }
 }
 
-void checkButtons() {
-  for (int i = 0; i < 2; i++) {
-    bool isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
+void checkMiss() {
+  if (miss <= 2) {
+    diverStepImage[0] = onTheBoatBitmap[0];
+    isDiverStepVisibled[0] = true;
+  }
 
-    if (isPressed != isButtonPressed[i]) {
-      isButtonPressed[i] = isPressed;
-
-      if (isPressed) {
-        if (pressedButton == 0 && (add3Score == 0 || !isPlaying)) {
-          pressedButton = i + 1;
-
-          if (!isPlaying || (isPlaying && (miss == 4 || (caught == 0 && (i == 0 || (i == 1 && ((clearMissCount > 0 && diverPosition > 0 && diverPosition <= 5) || (clearMissCount == 0 && diverPosition <= 5)))))))) {
-            if (!isPlaying || miss == 4) {
-              showHighScoreTime = 1;
-
-              if (!isPlaying || (isPlaying && miss == 4)) {
-                showHighScore(pressedButton);
-              }
-            } else if (i == 0) {
-              moveLeft();
-            } else if (i == 1) {
-              moveRight();
-            }
-          }
-        }
-      } else {
-        if (showHighScoreTime > 0) {
-          showHighScoreTime = 0;
-          isGameTypeVisibled = false;
-
-          if (pressedButton == i + 1) {
-            resetGame();
-            gameType = i + 1;
-            startGame();
-          }
-        }
-
-        pressedButton = 0;
-      }
-
+  switch (miss) {
+    case 0:
+      isRemainderVisibled[0] = true;
+      isRemainderVisibled[1] = true;
       break;
+
+    case 1:
+      isRemainderVisibled[0] = false;
+      isRemainderVisibled[1] = true;
+      tryAgain();
+      break;
+
+    case 2:
+      isRemainderVisibled[0] = false;
+      isRemainderVisibled[1] = false;
+      tryAgain();
+      break;
+
+    default:
+      checkHighScore();
+
+      if (isPlaying) {
+        caught = 7;
+        miss = 4;
+        secondCount = 0;
+      } else {
+        if (caught == 0) {
+          isMissDiverVisibled = false;
+          isMissArmVisibled = false;
+          isMissLegsVisibled = false;
+          isBagVisibled = false;
+          onTheBoatCount = 10;
+          secondCount = 0;
+          isRemainderVisibled[0] = true;
+          isRemainderVisibled[1] = true;
+          diverStepImage[0] = onTheBoatBitmap[0];
+          isDiverStepVisibled[0] = true;
+        }
+
+        addBonusScore = 0;
+        miss = 0;
+        tryAgain();
+      }
+      break;
+  }
+}
+
+bool checkShowHighScoreTime() {
+  bool finished = true;
+
+  if (showHighScoreTime > 0 && ((isGamepadEnabled && (pressedButton == BUTTON_A || pressedButton == BUTTON_B)) || (!isGamepadEnabled && (pressedButton == BUTTON_LEFT || pressedButton == BUTTON_RIGHT)))) {
+    if (++showHighScoreTime > 3) {
+      showHighScoreTime = 0;
+      isGameTypeVisibled = false;
+    } else {
+      showHighScore((pressedButton == BUTTON_A || pressedButton == BUTTON_LEFT) ? GAME_A : GAME_B);
+      finished = false;
+    }
+  }
+
+  return finished;
+}
+
+void checkSpeed() {
+  if (caught > 0 || addBonusScore > 0 || clearMissCount > 0) {
+    gameSpeed = diverSpeed;
+  } else {
+    gameSpeed = 50;
+
+    switch (gameType) {
+      case GAME_A:
+        gameSpeed = gameASpeed;
+
+        if (gameSpeed > 30 && ((score >= 70 && score < 100) || (score >= 160 && score < 190) || (score >= 250 && score < 280) || (score >= 330 && score < 360) || (score >= 430 && score < 460) || (score >= 520 && score < 560) || (score >= 610 && score < 650) || (score >= 710 && score < 740) || (score >= 810 && score < 830) || (score >= 930 && score < 970))) {
+          gameSpeed -= 30;
+        } else if (gameSpeed > 60 && ((score >= 190 && score < 200) || (score >= 280 && score < 300) || (score >= 560 && score < 600) || (score >= 650 && score < 690) || (score >= 740 && score < 780))) {
+          gameSpeed -= 60;
+        } else if (gameSpeed > 50 && ((score >= 360 && score < 390) || (score >= 460 && score < 490) || (score >= 830 && score < 870))) {
+          gameSpeed -= 50;
+        } else if (gameSpeed > 80 && ((score >= 390 && score < 400) || (score >= 490 && score < 500) || (score >= 690 && score < 700) || (score >= 780 && score < 800) || (score >= 870 && score < 900) || (score >= 970 && score <= 999))) {
+          gameSpeed -= 80;
+        }
+        break;
+
+      case GAME_B:
+        gameSpeed = gameBSpeed;
+
+        if (gameSpeed > 30 && ((score >= 30 && score < 70) || (score >= 130 && score < 160) || (score >= 220 && score < 250) || (score >= 330 && score < 360) || (score >= 430 && score < 460) || (score >= 520 && score < 560) || (score >= 610 && score < 650) || (score >= 710 && score < 740) || (score >= 830 && score < 870) || (score >= 930 && score < 970))) {
+          gameSpeed -= 30;
+        } else if (gameSpeed > 60 && ((score >= 70 && score < 100) || (score >= 160 && score < 190) || (score >= 250 && score < 280) || (score >= 360 && score < 390) || (score >= 460 && score < 490) || (score >= 560 && score < 600) || (score >= 650 && score < 690) || (score >= 740 && score < 780) || (score >= 870 && score < 900))) {
+          gameSpeed -= 60;
+        } else if (gameSpeed > 80 && ((score >= 190 && score < 200) || (score >= 280 && score < 300) || (score >= 390 && score < 400) || (score >= 490 && score < 500) || (score >= 690 && score < 700) || (score >= 780 && score < 800) || (score >= 970 && score < 999))) {
+          gameSpeed -= 80;
+        }
+        break;
+    }
+
+    if (gameSpeed < 0) {
+      gameSpeed = 0;
     }
   }
 }
 
-void resetGame() {
-  isShowResetScreen = false;
-  gameSpeed = 50;
-  isSecondChanged = false;
-  gameLoopTime = 0l;
-  gameType = 0;
-  isBagVisibled = false;
-  score = 0;
-  miss = 0;
-  isPlaying = false;
-  add3Score = 0;
-  secondCount = 0;
-  isScoreVisibled = false;
-  onTheBoatCount = 10;
-  caught = 0;
-  clearMissCount = 0;
-  diverPosition = 0;
-  isRandomTentacle = false;
-  currentTentacle = 0;
-  isMissDiverVisibled = false;
-  isMissArmVisibled = false;
-  isMissLegsVisibled = false;
-  isGameTypeVisibled = false;
-  isColonVisibled = false;
-  isAMVisibled = false;
-  isPMVisibled = false;
-  memset(&isDiverStepVisibled, false, sizeof(isDiverStepVisibled));
-  memset(&isRemainderVisibled, true, sizeof(isRemainderVisibled));
-  memset(&isHourDigitVisibled, false, sizeof(isHourDigitVisibled));
-  memset(&isMinuteDigitVisibled, false, sizeof(isMinuteDigitVisibled));
-  memset(&isEndOfTentacle, false, sizeof(isEndOfTentacle));
-  memset(&tentacleDirection, 0, sizeof(tentacleDirection));
-  memset(&tentacleCount, 0, sizeof(tentacleCount));
-  memset(&isTentacleVisibled, false, sizeof(isTentacleVisibled));
-  diverStepImage[0] = onTheBoatBitmap[0];
-  isDiverStepVisibled[0] = true;
-  showTime();
+void checkTentacle() {
+  bool isPlaySound = false;
+  tentacle = 0;
+  diverPositionIndex = 0;
+  isNextTentacle = false;
 
-  if (isFPSVisibled) {
-    showFPS(frameRate);
+  if ((currentTentacle > 1 && ((tentacleCount[currentTentacle] == 0 && random(5) <= 2) || tentacleCount[currentTentacle] > 0)) || (currentTentacle <= 1 && ((tentacleCount[0] == 0 && tentacleCount[1] == 0 && random(5) <= 2) || (tentacleCount[currentTentacle] > 0)))) {
+    isNextTentacle = false;
+
+    if (currentTentacle == 0 || currentTentacle == 1) {
+      if (tentacleCount[0] == 0 && tentacleCount[1] == 0 && isRandomTentacle) {
+        currentTentacle = random(2);
+        isRandomTentacle = false;;
+      } else if (tentacleCount[0] == 0 && tentacleCount[1] == 0 && !isRandomTentacle) {
+        isNextTentacle = true;
+        isRandomTentacle = true;
+      }
+    }
+
+    tentacle = currentTentacle;
+
+    if (isNextTentacle) {
+      isPlaySound = (addBonusScore == 0) ? true : false;
+    } else if (!isNextTentacle && tentacleDirection[tentacle] == 0) {
+      isTentacleVisibled[tentacle][tentacleCount[tentacle]] = true;
+      isPlaySound = (addBonusScore == 0) ? true : false;
+
+      if (++tentacleCount[tentacle] == maxTentacleCount[tentacle]) {
+        isEndOfTentacle[tentacle] = true;
+        diverPositionIndex = (diverPosition > 5) ? 5 : diverPosition;
+
+        if (diverPositionIndex == tentacle + 1) {
+          diverStepImage[diverPositionIndex] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
+          isPlaySound = false;
+          gotCaught();
+        }
+
+        tentacleDirection[tentacle] = 1;
+      } else {
+        isEndOfTentacle[tentacle] = false;
+      }
+    } else if (!isNextTentacle) {
+      if (gameType == GAME_B && tentacleDirection[tentacle] == 1 && tentacleCount[tentacle] == 1 && random(10) == 0) {
+        tentacleDirection[tentacle] = 0;
+        isPlaySound = (addBonusScore == 0) ? true : false;
+      } else {
+        tentacleCount[tentacle]--;
+        isTentacleVisibled[tentacle][tentacleCount[tentacle]] = false;
+        isEndOfTentacle[tentacle] = false;
+        isPlaySound = (addBonusScore == 0) ? true : false;
+
+        if (tentacle < 2) {
+          isRandomTentacle = false;
+        }
+
+        if (tentacleCount[tentacle] == 0) {
+          tentacleDirection[tentacle] = 0;
+        }
+      }
+    }
+  } else {
+    tentacle = currentTentacle;
+    isPlaySound = (addBonusScore == 0) ? true : false;
+  }
+
+  if (isPlaySound) {
+    playSound(0);
+  }
+
+  currentTentacle = tentacle + 1;
+
+  if (currentTentacle > 4) {
+    currentTentacle = 0;
   }
 }
 
@@ -1257,47 +818,9 @@ void gotCaught() {
   }
 }
 
-void readHighScores() {
-  short i = eepromAddress;
-
-  if (espert.eeprom.read(i, eepromKey.length()) == eepromKey) {
-    i += eepromKey.length();
-    bool invalid = false;
-    String data = espert.eeprom.read(i, 3);
-    gameAHighScore = data.toInt();
-    if (gameAHighScore < 0 || gameAHighScore > 999) {
-      gameAHighScore = constrain(gameAHighScore, 0, 999);
-      invalid = true;
-    }
-
-    i += 3;
-    data = espert.eeprom.read(i, 3);
-    gameBHighScore = data.toInt();
-    if (gameBHighScore < 0 || gameBHighScore > 999) {
-      gameBHighScore = constrain(gameBHighScore, 0, 999);
-      invalid = true;
-    }
-
-    if (invalid) {
-      writeHighScores();
-    }
-  }
-}
-
-void writeHighScores() {
-  short i = eepromAddress;
-  espert.eeprom.write(i, eepromKey);
-
-  i += eepromKey.length();
-  espert.eeprom.write(i, intToString(gameAHighScore, 3, "0"));
-
-  i += 3;
-  espert.eeprom.write(i, intToString(gameBHighScore, 3, "0"));
-}
-
 void initGame() {
   resetGame();
-  readHighScores();
+  readHighScore();
   showResetScreen();
   render();
 
@@ -1397,10 +920,81 @@ void initGame() {
 
   delay(showResetScreenTime);
   resetGame();
-  gameType = 0;
+  gameType = GAME_NONE;
   lastFrameTime = millis();
   fpsLastFrameTime = lastFrameTime;
   timeSyncLastFrameTime = lastFrameTime;
+
+  espert.buzzer.on(1);
+  espert.buzzer.on(0);
+}
+
+String intToString(int value, int length, String prefixChar) {
+  String stringValue = String(value);
+  String prefix = "";
+
+  for (int i = 0; i < length - stringValue.length(); i++) {
+    prefix += prefixChar;
+  }
+
+  return prefix + stringValue;
+}
+
+void moveLeft() {
+  if (diverPosition >= 1) {
+    if (diverPosition > 5) {
+      diverPosition = 5;
+    }
+
+    if (diverPosition > 1) {
+      isDiverStepVisibled[diverPosition] = false;
+      diverPosition--;
+      diverStepImage[diverPosition] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
+      isDiverStepVisibled[diverPosition] = true;
+
+      if (isEndOfTentacle[diverPosition - 1]) {
+        gotCaught();
+      }
+    } else if (isBagVisibled && clearMissCount == 0) {
+      isDiverStepVisibled[diverPosition] = false;
+      diverPosition--;
+      addBonusScore = 4;
+      diverStepImage[diverPosition] = onTheBoatBitmap[1];
+      isDiverStepVisibled[diverPosition] = true;
+    }
+  }
+}
+
+void moveRight() {
+  onTheBoatCount = 0;
+
+  if (diverPosition < 5) {
+    isDiverStepVisibled[diverPosition] = false;
+    diverPosition++;
+    diverStepImage[diverPosition] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
+    isDiverStepVisibled[diverPosition] = true;
+
+    if (isEndOfTentacle[diverPosition - 1]) {
+      gotCaught();
+    }
+  } else if (diverPosition < 10 && clearMissCount == 0) {
+    if (++diverPosition == 9) {
+      diverPosition = 5;
+    } else if (diverPosition == 8) {
+      isBagVisibled = true;
+
+      if (isPlaying && caught == 0) {
+        playSound(1);
+        addScore();
+      }
+    }
+
+    diverStepImage[5] = diverBitmap[((diverPosition - 1) * 2) + isBagVisibled];
+
+    if (isEndOfTentacle[5 - 1]) {
+      gotCaught();
+    }
+  }
 }
 
 void playSound(int index) {
@@ -1432,4 +1026,446 @@ void playSound(int index) {
 
     espert.buzzer.on(frequency);
   }
+}
+
+void readHighScore() {
+  short i = eepromAddress;
+
+  if (espert.eeprom.read(i, eepromKey.length()) == eepromKey) {
+    i += eepromKey.length();
+    bool invalid = false;
+    String data = espert.eeprom.read(i, 3);
+    gameAHighScore = data.toInt();
+    if (gameAHighScore < 0 || gameAHighScore > 999) {
+      gameAHighScore = constrain(gameAHighScore, 0, 999);
+      invalid = true;
+    }
+
+    i += 3;
+    data = espert.eeprom.read(i, 3);
+    gameBHighScore = data.toInt();
+    if (gameBHighScore < 0 || gameBHighScore > 999) {
+      gameBHighScore = constrain(gameBHighScore, 0, 999);
+      invalid = true;
+    }
+
+    if (invalid) {
+      writeHighScore();
+    }
+  }
+}
+
+void render() {
+  espert.oled.clear(false);
+  espert.oled.setColor(ESPERT_WHITE);
+  espert.oled.drawBitmap(0, 0, 128, 64, backgroundBitmap, false);
+
+  if (isGameTypeVisibled) {
+    espert.oled.drawBitmap(0, 56, 32, 8, gameTypeImage, false);
+  }
+
+  espert.oled.setColor(ESPERT_BLACK);
+
+  for (int i = 0; i < 6; i++) {
+    if (isDiverStepVisibled[i]) {
+      espert.oled.drawBitmap(diverStepPosition[i].x, diverStepPosition[i].y, 16, 16, diverStepImage[i], false);
+    }
+
+    for (int j = 0; j < 5; j++) {
+      if (i < maxTentacleCount[j] && isTentacleVisibled[j][i]) {
+        espert.oled.drawBitmap(tentaclePosition[j][i].x, tentaclePosition[j][i].y, 8, 8, tentacleBitmap[j][i], false);
+      }
+    }
+
+    if (i < 2) {
+      if (isRemainderVisibled[i]) {
+        espert.oled.drawBitmap(remainderPosition[i].x, remainderPosition[i].y, 16, 16, remainderBitmap, false);
+      }
+
+      if (isHourDigitVisibled[i]) {
+        espert.oled.drawBitmap(hourDigitPosition[i].x, hourDigitPosition[i].y, 8, 8, hourDigitImage[i], false);
+      }
+
+      if (isMinuteDigitVisibled[i]) {
+        espert.oled.drawBitmap(minuteDigitPosition[i].x, minuteDigitPosition[i].y, 8, 8, minuteDigitImage[i], false);
+      }
+
+      if (isFPSVisibled) {
+        if (i == 0) {
+          espert.oled.drawBitmap(101, 4, 16, 8, fpsBitmap, false);
+        }
+
+        if (isFPSDigitVisibled[i]) {
+          espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, 8, 8, fpsDigitImage[i], false);
+        }
+      }
+
+      if (i == 0) {
+        if (isColonVisibled) {
+          espert.oled.drawBitmap(74, 1, 8, 8, colonBitmap, false);
+        }
+
+        if (isAMVisibled) {
+          espert.oled.drawBitmap(52, 1, 16, 8, amBitmap, false);
+        }
+
+        if (isPMVisibled) {
+          espert.oled.drawBitmap(52, 5, 16, 8, pmBitmap, false);
+        }
+
+        if (isMissDiverVisibled) {
+          espert.oled.drawBitmap(missDiverPosition.x, missDiverPosition.y, 16, 16, missDiverBitmap, false);
+        }
+
+        if (isMissArmVisibled) {
+          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, 8, 8, missArmImage, false);
+        }
+
+        if (isMissLegsVisibled) {
+          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, 16, 16, missLegsImage, false);
+        }
+
+        if (isShowResetScreen) {
+          espert.oled.drawBitmap(diverStepPosition[0].x, diverStepPosition[0].y, 16, 16, onTheBoatBitmap[0], false);
+          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, 16, 16, diverBitmap[11], false);
+          espert.oled.drawBitmap(diverStepPosition[5].x, diverStepPosition[5].y, 16, 16, diverBitmap[15], false);
+          espert.oled.drawBitmap(missArmPosition.x, missArmPosition.y, 8, 8, missArmBitmap[0], false);
+          espert.oled.drawBitmap(missLegsPosition.x, missLegsPosition.y, 16, 16, missLegsBitmap[0], false);
+        }
+      }
+    }
+  }
+
+  espert.oled.update();
+}
+
+void resetGame() {
+  isShowResetScreen = false;
+  gameSpeed = 50;
+  isSecondChanged = false;
+  gameLoopTime = 0l;
+  gameType = GAME_NONE;
+  isBagVisibled = false;
+  score = 0;
+  miss = 0;
+  isPlaying = false;
+  addBonusScore = 0;
+  secondCount = 0;
+  isScoreVisibled = false;
+  onTheBoatCount = 10;
+  caught = 0;
+  clearMissCount = 0;
+  diverPosition = 0;
+  isRandomTentacle = false;
+  currentTentacle = 0;
+  isMissDiverVisibled = false;
+  isMissArmVisibled = false;
+  isMissLegsVisibled = false;
+  isGameTypeVisibled = false;
+  isColonVisibled = false;
+  isAMVisibled = false;
+  isPMVisibled = false;
+  memset(&isDiverStepVisibled, false, sizeof(isDiverStepVisibled));
+  memset(&isRemainderVisibled, true, sizeof(isRemainderVisibled));
+  memset(&isHourDigitVisibled, false, sizeof(isHourDigitVisibled));
+  memset(&isMinuteDigitVisibled, false, sizeof(isMinuteDigitVisibled));
+  memset(&isEndOfTentacle, false, sizeof(isEndOfTentacle));
+  memset(&tentacleDirection, 0, sizeof(tentacleDirection));
+  memset(&tentacleCount, 0, sizeof(tentacleCount));
+  memset(&isTentacleVisibled, false, sizeof(isTentacleVisibled));
+  diverStepImage[0] = onTheBoatBitmap[0];
+  isDiverStepVisibled[0] = true;
+  showTime();
+
+  if (isFPSVisibled) {
+    showFPS(frameRate);
+  }
+}
+
+void showFPS(short value) {
+  value = constrain(value, 0, 99);
+  String fpsString = intToString(value, 2, "0");
+  memset(&isFPSDigitVisibled, isFPSVisibled, sizeof(isFPSDigitVisibled));
+
+  for (int i = 0; i < 2; i++) {
+    fpsDigitImage[i] = numberBitmap[fpsString.charAt(i) - '0'];
+  }
+
+  if (value > 0 && value < 10) {
+    isFPSDigitVisibled[0] = false;
+  }
+}
+
+void showGameType(byte gameTypeValue) {
+  isGameTypeVisibled = false;
+
+  if (gameTypeValue == GAME_A || gameTypeValue == GAME_B) {
+    isGameTypeVisibled = true;
+    gameTypeImage = gameTypeBitmap[gameTypeValue - 1];
+  }
+}
+
+void showHighScore(byte gameTypeValue) {
+  isGameTypeVisibled = true;
+  gameTypeImage = gameTypeBitmap[gameTypeValue - 1];
+  showScore((gameTypeValue == GAME_A) ? gameAHighScore : gameBHighScore);
+}
+
+void showResetScreen(byte gameTypeValue) {
+  isShowResetScreen = true;
+
+  if (gameTypeValue == GAME_A || gameTypeValue == GAME_B) {
+    isGameTypeVisibled = true;
+    gameTypeImage = gameTypeBitmap[gameTypeValue - 1];
+    showScore((gameTypeValue == 1) ? gameAHighScore : gameBHighScore);
+  } else {
+    isGameTypeVisibled = false;
+    isAMVisibled = true;
+    isPMVisibled = false;
+    isColonVisibled = true;
+    memset(&isHourDigitVisibled, true, sizeof(isHourDigitVisibled));
+    memset(&isMinuteDigitVisibled, true, sizeof(isMinuteDigitVisibled));
+
+    for (int i = 0; i < 2; i++) {
+      hourDigitImage[i] = numberBitmap[i + 1];
+      minuteDigitImage[i] = numberBitmap[0];
+    }
+
+    if (isFPSVisibled) {
+      showFPS(0);
+    }
+  }
+
+  memset(&isDiverStepVisibled, true, sizeof(isDiverStepVisibled));
+  memset(&isRemainderVisibled, true, sizeof(isRemainderVisibled));
+  memset(&isTentacleVisibled, true, sizeof(isTentacleVisibled));
+  isMissDiverVisibled = true;
+  isMissArmVisibled = true;
+  isMissLegsVisibled = true;
+  missArmImage = missArmBitmap[1];
+  missLegsImage = missLegsBitmap[1];
+
+  for (int i = 0; i < 6; i++) {
+    diverStepImage[i] = (i == 0) ? onTheBoatBitmap[1] : diverBitmap[((i - 1) * 2) + 1];
+  }
+}
+
+void showScore(short value) {
+  String scoreString = intToString(value, 3, "0");
+  isScoreVisibled = true;
+  isAMVisibled = false;
+  isPMVisibled = false;
+  isColonVisibled = false;
+  isHourDigitVisibled[0] = false;
+
+  if (scoreString.charAt(0) != '0') {
+    hourDigitImage[1] = numberBitmap[scoreString.charAt(0) - '0'];
+    isHourDigitVisibled[1] = true;
+    minuteDigitImage[0] = numberBitmap[scoreString.charAt(1) - '0'];
+    isMinuteDigitVisibled[0] = true;
+  } else {
+    isHourDigitVisibled[1] = false;
+
+    if (scoreString.charAt(1) != '0') {
+      minuteDigitImage[0] = numberBitmap[scoreString.charAt(1) - '0'];
+      isMinuteDigitVisibled[0] = true;
+    } else {
+      isMinuteDigitVisibled[0] = false;
+    }
+  }
+
+  minuteDigitImage[1] = numberBitmap[scoreString.charAt(2) - '0'];
+  isMinuteDigitVisibled[1] = true;
+}
+
+void showTime() {
+  if (checkShowHighScoreTime()) {
+    showHighScoreTime = 0;
+
+    if (isTimeVisibled) {
+      isColonVisibled = (seconds % 2 == 0) ? true : false;
+      isAMVisibled = (hours < 12) ? true : false;
+      isPMVisibled = !isAMVisibled;
+      int h = hours % 12;
+      String hh = intToString((h == 0) ? 12 : h, 2, "0");
+      String mm = intToString(minutes, 2, "0");
+      memset(&isHourDigitVisibled, true, sizeof(isHourDigitVisibled));
+      memset(&isMinuteDigitVisibled, true, sizeof(isMinuteDigitVisibled));
+
+      for (int i = 0; i < 2; i++) {
+        hourDigitImage[i] = numberBitmap[hh.charAt(i) - '0'];
+        minuteDigitImage[i] = numberBitmap[mm.charAt(i) - '0'];
+      }
+
+      if (hh.charAt(0) == '0') {
+        isHourDigitVisibled[0] = false;
+      }
+    }
+  }
+}
+
+void startGame() {
+  if (!isPlaying) {
+    gameLoopTime = 0l;
+    showGameType(gameType);
+    isMissDiverVisibled = false;
+    isMissArmVisibled = false;
+    isMissLegsVisibled = false;
+    isPlaying = true;
+    isBagVisibled = false;
+    clearMissCount = 0;
+    isRandomTentacle = false;
+    memset(&isEndOfTentacle, false, sizeof(isEndOfTentacle));
+    memset(&tentacleDirection, 0, sizeof(tentacleDirection));
+
+    for (int i = 0; i < 5; i++) {
+      isDiverStepVisibled[i + 1] = false;
+
+      if (tentacleCount[i] > 0) {
+        for (int j = tentacleCount[i] - 1; j >= 0; j--) {
+          isTentacleVisibled[i][j] = false;
+        }
+      }
+
+      tentacleCount[i] = 0;
+    }
+
+    currentTentacle = 0;
+    addBonusScore = 0;
+    diverPosition = 0;
+    onTheBoatCount = 10;
+    secondCount = 0;
+    score = 0;
+    caught = 0;
+    showScore(score);
+    checkSpeed();
+    miss = 0;
+    checkDiver();
+    checkMiss();
+  }
+}
+
+void tryAgain() {
+  for (int i = 1; i < 6; i++) {
+    isDiverStepVisibled[i] = false;
+  }
+
+  diverPosition = 0;
+}
+
+void update() {
+  // game time
+  unsigned long frameTime = millis();
+  elapsedTime = frameTime - lastFrameTime;
+  lastFrameTime = frameTime;
+
+  // frame rate
+  frameCount++;
+  if (frameTime - fpsLastFrameTime >= 1000l) {
+    frameRate = frameCount;
+    frameCount = 0l;
+    fpsLastFrameTime = frameTime;
+  }
+
+  // time sync
+  unsigned long t = frameTime - timeSyncLastFrameTime;
+  if (t >= 1000l) {
+    timeSyncLastFrameTime = frameTime - (t - 1000l);
+    isSecondChanged = true;
+
+    if (isTimeVisibled) {
+      if (++seconds > 59) {
+        seconds = 0;
+
+        if (++minutes > 59) {
+          minutes = 0;
+
+          if (++hours > 23) {
+            hours = 0;
+          }
+        }
+      }
+    }
+
+    if (isFPSVisibled) {
+      showFPS(frameRate);
+    }
+  }
+
+  // button
+  buttonDelay += elapsedTime;
+
+  if (buttonDelay >= maxButtonDelay) {
+    buttonDelay = 0.0f;
+    checkButtons();
+  }
+
+  // sound
+  if (buzzerDuration > 0.0f) {
+    buzzerDuration -= elapsedTime;
+
+    if (buzzerDuration <= 0.0f) {
+      buzzerDuration = 0.0f;
+      espert.buzzer.off();
+    }
+  }
+
+  // game loop
+  if (!isShowResetScreen) {
+    gameLoopTime += elapsedTime;
+
+    if (gameLoopTime >= gameSpeed) {
+      gameLoopTime -= gameSpeed;
+
+      if (!isPlaying) {
+        autoPlayScreen();
+      } else {
+        if (isSecondChanged) {
+          isSecondChanged = false;
+
+          if (miss == 4 && ++secondCount > 3) {
+            showHighScoreTime = 0;
+            resetGame();
+            tryAgain();
+          }
+
+          if (caught == 0 && clearMissCount == 0 && onTheBoatCount > 0) {
+            secondCount++;
+
+            if (--onTheBoatCount == 0) {
+              moveRight();
+              secondCount = 0;
+            }
+          }
+        }
+
+        if (caught == 0) {
+          checkBonusScore();
+
+          if (clearMissCount == 0) {
+            checkTentacle();
+
+            if (diverPosition > 5) {
+              moveRight();
+            }
+          } else {
+            checkClearMiss();
+          }
+        } else if (caught > 0) {
+          checkCaught();
+        }
+      }
+    }
+  }
+}
+
+void writeHighScore() {
+  short i = eepromAddress;
+  espert.eeprom.write(i, eepromKey);
+
+  i += eepromKey.length();
+  espert.eeprom.write(i, intToString(gameAHighScore, 3, "0"));
+
+  i += 3;
+  espert.eeprom.write(i, intToString(gameBHighScore, 3, "0"));
 }

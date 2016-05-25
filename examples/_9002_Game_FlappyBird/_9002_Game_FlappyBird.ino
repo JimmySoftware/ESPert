@@ -3,17 +3,36 @@
 #include <ESPert.h>
 ESPert espert;
 
-// button pin
+// button
+typedef enum {
+  BUTTON_NONE = -1,
+  BUTTON_LEFT,
+  BUTTON_RIGHT,
+  BUTTON_UP,
+  BUTTON_DOWN,
+  BUTTON_A,
+  BUTTON_B
+} ButtonType;
+
+static const byte numberOfButtons = 6;
+int gamepadPin[numberOfButtons] = {12, 13, 14, 2, 0, A0}; // (left, right, up, down, a, b)
+bool isGamepadEnabled = true;
+
 #ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V1
-int buttonPin[2] = {0, 2};
+int buttonPin[numberOfButtons] = {0, 2, -1, -1, -1, -1}; // USER, FLASH
 #else
-int buttonPin[2] = {0, 13};
+int buttonPin[numberOfButtons] = {0, 13, -1, -1, -1, -1}; // GPIO0, GPIO13
 #endif
-int gamepadPin[2] = {14, 1};
-bool isGamepadEnabled = false;
+
+ESPert_Button button[numberOfButtons];
+static const int maxButtonDelay = 10; // milliseconds
+float buttonDelay = 0.0f;
+bool isButtonPressed[numberOfButtons] = {false};
+int pressedButton = BUTTON_NONE;
+bool isButtonAllowed = true;
 
 // sound (buzzer)
-static const int buzzerPin = 12;
+static const int buzzerPin = isGamepadEnabled ? 15 : 12;
 float buzzerDuration = 0.0f;
 bool isSoundEnabled = true;
 
@@ -179,13 +198,22 @@ const uint8_t titleBitmap[] PROGMEM = { // title.png
   0xEF, 0x03, 0xFB, 0xFB, 0xFB, 0x83, 0xFB, 0xFB, 0xFB, 0x00,
   0xFE, 0xFE, 0xFE, 0x66, 0xFE, 0xFD, 0x03, 0xDB, 0xDB, 0xDB,
   0x03, 0xEF, 0xF7, 0x77, 0x37, 0x37, 0x07, 0xEF, 0xF7, 0xF7,
-  0x30, 0xFE, 0xFE, 0x00, 0xE0, 0xE7, 0xE7, 0xE7, 0xE0, 0xFE,
-  0xE0, 0xE7, 0xE7, 0xE7, 0xE0, 0xF3, 0xE7, 0xE7, 0xE6, 0xE7,
-  0xE7, 0x00, 0x3F, 0x3F, 0x3F, 0x06, 0xE7, 0xF3, 0x00, 0x3F,
-  0x3F, 0x3F, 0x06, 0xE7, 0xF3, 0xF8, 0xFC, 0x01, 0x33, 0x33,
-  0x3F, 0x3F, 0x9F, 0xC0, 0xE7, 0xE7, 0xE7, 0xE6, 0xE7, 0xF3,
-  0xE0, 0xE7, 0xE7, 0xE7, 0xE0, 0xE7, 0xE7, 0xE0, 0xFF, 0xFF,
-  0xF8, 0xF3, 0xE7, 0xE7, 0xE6, 0xE7, 0xE7, 0xE0
+  0x30, 0xFE, 0xFE, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xE0, 0xE7, 0xE7, 0xE7, 0xE0, 0xFE, 0xE0, 0xE7,
+  0xE7, 0xE7, 0xE0, 0xF3, 0xE7, 0xE7, 0xE6, 0xE7, 0xE7, 0x00,
+  0x3F, 0x3F, 0x3F, 0x06, 0xE7, 0xF3, 0x00, 0x3F, 0x3F, 0x3F,
+  0x06, 0xE7, 0xF3, 0xF8, 0xFC, 0x01, 0x33, 0x33, 0x3F, 0x3F,
+  0x9F, 0xC0, 0xE7, 0x27, 0xA7, 0xA6, 0xE7, 0xB3, 0xE0, 0xE7,
+  0xE7, 0xE7, 0xE0, 0xE7, 0xE7, 0xE0, 0xFF, 0xFF, 0xF8, 0x33,
+  0xE7, 0xE7, 0xE6, 0xE7, 0xE7, 0x20, 0x7F, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFA, 0xFA, 0xF8, 0xFF, 0xF8,
+  0xFF, 0xF8, 0xFE, 0xF9, 0xFE, 0xF8, 0xFF, 0xF8, 0xFB, 0xF8,
+  0xFF, 0xF8, 0xFF, 0xFA, 0xFA, 0xF9, 0xFF, 0xF8, 0xFB, 0xFF,
+  0xF8, 0xFA, 0xF8, 0xFF, 0xF8, 0xFE
 };
 
 const uint8_t titleMaskBitmap[] PROGMEM = { // titleMask.png
@@ -195,13 +223,22 @@ const uint8_t titleMaskBitmap[] PROGMEM = { // titleMask.png
   0x0F, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x03, 0x03, 0x03,
   0x03, 0x0F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x0F, 0x07, 0x07,
-  0x00, 0x00, 0x00, 0x00, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xFE,
-  0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xF0, 0xE0, 0xE0, 0xE0, 0xE0,
-  0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0xF0, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0xE0, 0xF0, 0xF8, 0xFC, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x80, 0xC0, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xF0,
-  0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xFF, 0xFF,
-  0xF8, 0xF0, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0
+  0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xFE, 0xE0, 0xE0,
+  0xE0, 0xE0, 0xE0, 0xF0, 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0xE0, 0xF0, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0xE0, 0xF0, 0xF8, 0xFC, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x60,
+  0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x7F, 0x7F, 0x18, 0x10,
+  0x00, 0x60, 0x60, 0x60, 0x00, 0x00, 0x1F, 0x3F, 0x7F, 0x7F,
+  0x7F, 0x7F, 0x7F, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0,
+  0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0,
+  0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0,
+  0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0
 };
 
 const uint8_t getReadyBitmap[] PROGMEM = { // getReady.png
@@ -543,39 +580,31 @@ const uint8_t newMaskBitmap[] PROGMEM { // newMask.png
   0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80
 };
 
-struct Point {
+typedef struct {
   float x;
   float y;
-};
+} Point;
 
-enum {
+typedef enum {
   SOUND_NONE,
   SOUND_DIE,
   SOUND_SCORE,
   SOUND_SCORE_NEXT,
-};
+} SoundType;
 
-enum {
+typedef enum {
   GAME_MODE_TITLE,
   GAME_MODE_GET_READY,
   GAME_MODE_PLAY,
   GAME_MODE_GAME_OVER
-};
+} GameMode;
 
-enum {
+typedef enum {
   MEDAL_BRONZE,
   MEDAL_SILVER,
   MEDAL_GOLD,
   MEDAL_PLATINUM
-};
-
-// button
-ESPert_Button button[2];
-static const int maxButtonDelay = 10; // milliseconds
-float buttonDelay = 0.0f;
-bool isButtonPressed[2] = {false};
-int pressedButton = 0;
-bool isButtonAllowed = true;
+} MedalType;
 
 // game time
 unsigned long lastFrameTime = 0l;
@@ -598,6 +627,10 @@ bool isGameOver = false;
 int nextSound = SOUND_NONE;
 float nextSoundDelay = 0.0f;
 bool isCheckHighScore = false;
+float titleTime = 0.0f;
+float getReadyTime = 0.0f;
+float gameOverTime = 0.0f;
+bool isAutoPlay = false;
 
 // bird
 Point birdSize = {16, 16};
@@ -656,24 +689,27 @@ static const float pipeRandomNextTime = 2000.0f; // milliseconds
 float pipeRandomTime = 0.0f;
 
 // function prototypes
-void update();
-void render();
-void pressButtons();
-void checkButtons();
+void addScore(int value);
+void changeGameMode(int mode);
 void checkHighScore();
-void readHighScores();
-void writeHighScores();
-String intToString(int value, int length, String prefixChar = "0");
-void playSound(int index);
+void drawBitmap(int x, int y, int width, int height, const uint8_t* bitmap, const uint8_t* mask = NULL, int color = ESPERT_BLACK);
 void initGame();
+String intToString(int value, int length, String prefixChar = "0");
+bool isHitPipe();
+void jump();
+float lerp(float t, float v0, float v1);
+void playSound(int index);
+void pressButtons();
+void readHighScore();
+void render();
+void resetBird();
 void resetGame();
 void setFPSImages(int value);
-void changeGameMode(int mode);
-void drawBitmap(int x, int y, int width, int height, const uint8_t* bitmap, const uint8_t* mask = NULL, int color = ESPERT_BLACK);
-void updateBirdAnimation(bool rotate);
-float lerp(float t, float v0, float v1);
+void setScoreImages();
 void setScorePanelImages(const uint8_t* digitImage[3], int value);
-bool isHitPipe();
+void update();
+void updateBirdAnimation(bool rotate);
+void writeHighScore();
 
 void setup() {
   espert.init();
@@ -681,17 +717,17 @@ void setup() {
   espert.buzzer.init(buzzerPin);
   randomSeed(analogRead(0));
 
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < numberOfButtons; i++) {
     if (isGamepadEnabled) {
       buttonPin[i] = gamepadPin[i];
     }
 
-    button[i].init(buttonPin[i]);
+    if (buttonPin[i] != -1) {
+      button[i].init(buttonPin[i], INPUT_PULLUP);
+    }
   }
 
   initGame();
-  espert.buzzer.on(1);
-  espert.buzzer.on(0);
 }
 
 void loop() {
@@ -699,156 +735,246 @@ void loop() {
   render();
 }
 
-void update() {
-  // game time
-  unsigned long frameTime = millis();
-  elapsedTime = frameTime - lastFrameTime;
-  lastFrameTime = frameTime;
+void addScore(int value) {
+  score = constrain(score + value, 0, 999);
+  setScoreImages();
+}
 
-  // frame rate
-  frameCount++;
-  if (frameTime - fpsLastFrameTime >= 1000l) {
-    frameRate = frameCount;
-    frameCount = 0l;
-    fpsLastFrameTime = frameTime;
-    setFPSImages(frameRate);
-  }
-
-  // button
-  buttonDelay += elapsedTime;
-  if (buttonDelay >= maxButtonDelay) {
-    buttonDelay = 0.0f;
-    pressButtons();
-  }
-  checkButtons();
-
-  // sound
-  if (buzzerDuration > 0.0f) {
-    buzzerDuration -= elapsedTime;
-
-    if (buzzerDuration <= 0.0f) {
-      buzzerDuration = 0.0f;
-      espert.buzzer.off();
-    }
-  } else if (nextSoundDelay > 0.0f) {
-    nextSoundDelay -= elapsedTime;
-
-    if (nextSoundDelay <= 0.0f) {
-      nextSoundDelay = 0.0f;
-      playSound(nextSound);
-    }
-  }
-
-  switch (gameMode) {
+void changeGameMode(int mode) {
+  switch (mode) {
     case GAME_MODE_TITLE:
-    case GAME_MODE_GET_READY:
-      updateBirdAnimation(false);
+      readHighScore();
+      resetGame();
+      titleTime = 0.0f;
+      birdPosition.x = (screenSize.x - birdSize.x) * 0.5f;
+      birdDegrees = 1;
+      break;
 
-      if (birdPosition.y >= 20 + (gameMode == GAME_MODE_TITLE ? 5 : 0)) {
-        velocity = initialVelocity * 0.7f;
-      }
+    case GAME_MODE_GET_READY:
+      getReadyTime = 0.0f;
+      resetBird();
+      birdDegrees = 1;
       break;
 
     case GAME_MODE_PLAY:
-      updateBirdAnimation(true);
-
-      if (isGameOver) {
-        changeGameMode(GAME_MODE_GAME_OVER);
-      } else if (!isHit) {
-        for (int i = 0; i < numberOfPipes; i++) {
-          if (isPipeVisibled[i]) {
-            if (isPipeEnabled[i] && birdPosition.x + (birdSize.x * 0.5f) >= pipePosition[i].x + (pipeSize.x * 0.5f)) {
-              if (birdPosition.y >= pipePosition[i].y - birdCollisionOffset.y && pipePosition[i].y <= pipePosition[i].y + heightBetweenPipes - birdSize.y + birdCollisionOffset.y) { // between two pipes
-                addScore(1);
-                isPipeEnabled[i] = false;
-                playSound(SOUND_SCORE);
-              }
-            }
-
-            pipePosition[i].x -= elapsedTime * landSpeed;
-            if (pipePosition[i].x < -pipeSize.x) {
-              isPipeVisibled[i] = false;
-            }
-          }
-        }
-
-        if (pipeRandomTime == 0.0f) {
-          for (int i = 0; i < numberOfPipes; i++) {
-            if (!isPipeVisibled[i]) {
-              isPipeVisibled[i] = true;
-              isPipeEnabled[i] = true;
-              pipePosition[i].x = landOffset.x + (screenSize.x - landOffset.x);
-              pipePosition[i].y = random(pipeRandomFrom, pipeRandomTo);
-              pipeRandomTime = pipeRandomNextTime;
-              break;
-            }
-          }
-        } else {
-          pipeRandomTime -= elapsedTime;
-
-          if (pipeRandomTime <= 0.0f) {
-            pipeRandomTime = 0.0f;
-          }
-        }
-      }
       break;
 
     case GAME_MODE_GAME_OVER:
-      gameOverVelocity += gravity * (elapsedTime / 2000.0f);
-      gameOverPosition.y = constrain(gameOverPosition.y + gameOverVelocity, -64, landPosition);
-
-      if (gameOverVelocity > 0.0f && gameOverPosition.y >= 0.0f) {
-        gameOverPosition.y = 0.0f;
-
-        if (isCheckHighScore && scorePanelOffset != maxScorePanelOffset) {
-          isCheckHighScore = false;
-          checkHighScore();
-        }
-
-        scorePanelOffset = lerp(0.2f, scorePanelOffset, 0.0f);
-
-        if (scorePanelOffset <= 0.1f) {
-          if (!isButtonAllowed) {
-            isButtonAllowed = true;
-            pressedButton = 0;
-          }
-
-          if (scorePanelScore != score) {
-            float speed = constrain(fabs(scorePanelScore - score), 5.0f, 999.0f);
-            speed *= elapsedTime / 1000.0f;
-
-            if (scorePanelScore < score)
-            {
-              scorePanelScore += speed;
-
-              if (scorePanelScore > score)
-              {
-                scorePanelScore = score;
-              }
-            }
-            else if (scorePanelScore > score)
-            {
-              scorePanelScore -= speed;
-
-              if (scorePanelScore < score)
-              {
-                scorePanelScore = score;
-              }
-            }
-
-            setScorePanelImages(scorePanelScoreDigitImage, scorePanelScore);
-
-            if (isNewHighScore && scorePanelScore > scorePanelHighScore) {
-              scorePanelHighScore = scorePanelScore;
-              setScorePanelImages(scorePanelHighScoreDigitImage, scorePanelHighScore);
-            }
-          }
-        }
-      }
+      readHighScore();
+      gameOverTime = 0.0f;
+      isCheckHighScore = true;
+      gameOverVelocity = initialVelocity * 0.7f;
+      gameOverPosition.x = 32;
+      gameOverPosition.y = 0;
+      scorePanelOffset = maxScorePanelOffset;
+      scorePanelScore = 0;
+      scorePanelHighScore = highScore; // old highscore
+      scorePanelMedalImage = NULL;
+      setScorePanelImages(scorePanelScoreDigitImage, scorePanelScore);
+      setScorePanelImages(scorePanelHighScoreDigitImage, scorePanelHighScore);
+      isButtonAllowed = false;
+      pressedButton = BUTTON_NONE;
       break;
   }
 
-  ESP.wdtFeed();
+  gameMode = mode;
+}
+
+void checkHighScore() {
+  isNewHighScore = false;
+
+  if (score >= 40) {
+    scorePanelMedalImage = medalBitmap[MEDAL_PLATINUM];
+  } else if (score >= 30) {
+    scorePanelMedalImage = medalBitmap[MEDAL_GOLD];
+  } else if (score >= 20) {
+    scorePanelMedalImage = medalBitmap[MEDAL_SILVER];
+  } else if (score >= 10) {
+    scorePanelMedalImage = medalBitmap[MEDAL_BRONZE];
+  }
+
+  if (score > highScore) {
+    isNewHighScore = true;
+    highScore = score;
+
+    if (!isAutoPlay) {
+      writeHighScore();
+    }
+  }
+}
+
+void drawBitmap(int x, int y, int width, int height, const uint8_t* bitmap, const uint8_t* mask, int color) {
+  if (mask) {
+    espert.oled.setColor(1 - color);
+    espert.oled.drawBitmap(x, y, width, height, mask, false);
+  }
+
+  espert.oled.setColor(color);
+  espert.oled.drawBitmap(x, y, width, height, bitmap, false);
+}
+
+void initGame() {
+  readHighScore();
+  resetGame();
+  changeGameMode(GAME_MODE_TITLE);
+  lastFrameTime = millis();
+  fpsLastFrameTime = lastFrameTime;
+  setFPSImages(frameRate);
+
+  espert.buzzer.on(1);
+  espert.buzzer.on(0);
+}
+
+String intToString(int value, int length, String prefixChar) {
+  String stringValue = String(value);
+  String prefix = "";
+
+  for (int i = 0; i < length - stringValue.length(); i++) {
+    prefix += prefixChar;
+  }
+
+  return prefix + stringValue;
+}
+
+bool isHitPipe() {
+  if (!isHit) {
+    float x1 = birdPosition.x + birdCollisionOffset.x;
+    float y1 = birdPosition.y + birdCollisionOffset.y;
+    float w1 = birdSize.x - (birdCollisionOffset.x * 2.0f);
+    float h1 = birdSize.y - (birdCollisionOffset.y * 2.0f);
+    float w2 = pipeSize.x;
+    float h2 = pipeSize.y;
+
+    for (int i = 0; i < numberOfPipes && !isHit; i++) {
+      if (isPipeVisibled[i] && (!isAutoPlay || (isAutoPlay && isPipeEnabled[i]))) {
+        float x2 = pipePosition[i].x;
+
+        for (int pipe = 0; pipe < 2 && !isHit; pipe++) {
+          float y2 = pipePosition[i].y + (pipe == 0 ? -pipeSize.y : heightBetweenPipes);
+
+          isHit = !(x1 > x2 + w2 || x1 + w1 < x2 || y1 > y2 + h2 || y1 + h1 < y2);
+
+          if (isHit) {
+            playSound(SOUND_DIE);
+            isButtonAllowed = false;
+          }
+        }
+      }
+    }
+  }
+
+  return isHit;
+}
+
+void jump() {
+  velocity = initialVelocity;
+  isDropping = false;
+}
+
+float lerp(float t, float v0, float v1) {
+  v0 = (1.0f - t) * v0 + t * v1;
+
+  if (fabs(v1 - v0) < 1.0f) {
+    v0 = v1;
+  }
+
+  return v0;
+}
+
+void playSound(int index) {
+  if (!isAutoPlay && isSoundEnabled) {
+    nextSound = SOUND_NONE;
+    nextSoundDelay = 0.0f;
+    int frequency = 0;
+
+    switch (index) {
+      case SOUND_SCORE:
+        frequency = 5;
+        buzzerDuration = 20.0f;
+        nextSound = SOUND_SCORE_NEXT;
+        nextSoundDelay = 20.0f;
+        break;
+
+      case SOUND_SCORE_NEXT:
+        frequency = 10;
+        buzzerDuration = 80.0f;
+        break;
+
+      case SOUND_DIE:
+        frequency = 10;
+        buzzerDuration = 1000.0f;
+        break;
+
+      default:
+        frequency = 0;
+        buzzerDuration = 0.0f;
+        break;
+    }
+
+    espert.buzzer.on(frequency);
+  }
+}
+
+void pressButtons() {
+  for (int i = 0; i < numberOfButtons; i++) {
+    if (buttonPin[i] != -1) {
+      bool isPressed = false;
+
+      if (buttonPin[i] == A0) {
+        isPressed = (analogRead(buttonPin[i]) < 512) ? true : false;
+      } else {
+        isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
+      }
+
+      if (isPressed != isButtonPressed[i]) {
+        isButtonPressed[i] = isPressed;
+
+        if (isButtonAllowed || isAutoPlay) {
+          if (isPressed) {
+            pressedButton = i;
+
+            if (!isAutoPlay && (gameMode == GAME_MODE_GET_READY || gameMode == GAME_MODE_PLAY)) {
+              jump();
+
+              if (gameMode == GAME_MODE_GET_READY) {
+                changeGameMode(GAME_MODE_PLAY);
+              }
+            }
+          } else if (pressedButton == i) {
+            if ((isGamepadEnabled && (pressedButton == BUTTON_A || pressedButton == BUTTON_B)) || (!isGamepadEnabled && (pressedButton == BUTTON_LEFT || pressedButton == BUTTON_RIGHT))) {
+              if (isAutoPlay) {
+                readHighScore();
+                resetGame();
+                changeGameMode(GAME_MODE_GET_READY);
+              } else if (gameMode == GAME_MODE_TITLE) {
+                changeGameMode(GAME_MODE_GET_READY);
+              } else if (gameMode == GAME_MODE_GAME_OVER) {
+                changeGameMode(GAME_MODE_TITLE);
+              }
+            }
+
+            pressedButton = BUTTON_NONE;
+          }
+        }
+        break;
+      }
+    }
+  }
+}
+
+void readHighScore() {
+  int i = eepromAddress;
+
+  if (espert.eeprom.read(i, eepromKey.length()) == eepromKey) {
+    i += eepromKey.length();
+    String data = espert.eeprom.read(i, 3);
+    highScore = data.toInt();
+
+    if (highScore < 0 || highScore > 999) {
+      highScore = constrain(highScore, 0, 999);
+      writeHighScore();
+    }
+  }
 }
 
 void render() {
@@ -857,7 +983,7 @@ void render() {
 
   switch (gameMode) {
     case GAME_MODE_TITLE:
-      drawBitmap(32, 1, 64, 16, titleBitmap, titleMaskBitmap);
+      drawBitmap(32, 1, 72, 24, titleBitmap, titleMaskBitmap);
       drawBitmap(40, 48, 64, 16, makerAsiaBitmap, makerAsiaMaskBitmap);
       drawBitmap(birdPosition.x, birdPosition.y, 16, 16, birdBitmap[(int)birdFrame][(int)birdDegrees], birdMaskBitmap[(int)birdFrame][(int)birdDegrees]);
       break;
@@ -923,6 +1049,47 @@ void render() {
   ESP.wdtFeed();
 }
 
+void resetBird() {
+  velocity = 0.0f;
+  birdFrameDirection = 1;
+  birdDegrees = 0.0f;
+  isDropping = false;
+  dropPosition = 0.0f;
+  heightRatio = 0.0f;
+  birdPosition.x = 21;
+  birdPosition.y = (screenSize.y - birdSize.y) * 0.5f;
+  isHit = false;
+  isGameOver = false;
+}
+
+void resetGame() {
+  isAutoPlay = false;
+  resetBird();
+  isCheckHighScore = false;
+  score = 0;
+  setScoreImages();
+  buttonDelay = 0.0f;
+  pressedButton = BUTTON_NONE;
+  landOffset.x = screenSize.x;
+
+  memset(pipePosition, 0, sizeof(pipePosition));
+  memset(isPipeVisibled, false, sizeof(isPipeVisibled));
+  memset(isPipeEnabled, false, sizeof(isPipeEnabled));
+
+  pipeRandomTime = pipeRandomFirstTime;
+  gameOverVelocity = 0.0f;
+  gameOverPosition.x = 32;
+  gameOverPosition.y = 0;
+  scorePanelOffset = 0.0f;
+  scorePanelScore = 0.0f;
+  scorePanelHighScore = 0.0f;
+  isNewHighScore = false;
+  memset(scorePanelHighScoreDigitImage, NULL, sizeof(scorePanelHighScoreDigitImage));
+  memset(scorePanelScoreDigitImage, NULL, sizeof(scorePanelScoreDigitImage));
+  scorePanelMedalImage = NULL;
+  isButtonAllowed = true;
+}
+
 void setFPSImages(int value) {
   if (isFPSVisibled) {
     value = constrain(value, 0, 99);
@@ -938,108 +1105,6 @@ void setFPSImages(int value) {
     if (value > 0 && value < 10) {
       isFPSDigitVisibled[0] = false;
     }
-  }
-}
-
-void pressButtons() {
-  for (int i = 0; i < 2; i++) {
-    bool isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
-
-    if (isPressed != isButtonPressed[i]) {
-      isButtonPressed[i] = isPressed;
-
-      if (isButtonAllowed) {
-        if (isPressed) {
-          pressedButton = i + 1;
-
-          if (gameMode == GAME_MODE_GET_READY || gameMode == GAME_MODE_PLAY) {
-            velocity = initialVelocity;
-            isDropping = false;
-
-            if (gameMode == GAME_MODE_GET_READY) {
-              changeGameMode(GAME_MODE_PLAY);
-            }
-          }
-        } else if (pressedButton == i + 1) {
-          pressedButton = 0;
-
-          if (gameMode == GAME_MODE_TITLE) {
-            changeGameMode(GAME_MODE_GET_READY);
-          } else if (gameMode == GAME_MODE_GAME_OVER) {
-            changeGameMode(GAME_MODE_TITLE);
-          }
-        }
-      }
-      break;
-    }
-  }
-}
-
-String intToString(int value, int length, String prefixChar) {
-  String stringValue = String(value);
-  String prefix = "";
-
-  for (int i = 0; i < length - stringValue.length(); i++) {
-    prefix += prefixChar;
-  }
-
-  return prefix + stringValue;
-}
-
-void readHighScores() {
-  int i = eepromAddress;
-
-  if (espert.eeprom.read(i, eepromKey.length()) == eepromKey) {
-    i += eepromKey.length();
-    String data = espert.eeprom.read(i, 3);
-    highScore = data.toInt();
-
-    if (highScore < 0 || highScore > 999) {
-      highScore = constrain(highScore, 0, 999);
-      writeHighScores();
-    }
-  }
-}
-
-void writeHighScores() {
-  int i = eepromAddress;
-  espert.eeprom.write(i, eepromKey);
-
-  i += eepromKey.length();
-  espert.eeprom.write(i, intToString(highScore, 3, "0"));
-}
-
-void playSound(int index) {
-  if (isSoundEnabled) {
-    nextSound = SOUND_NONE;
-    nextSoundDelay = 0.0f;
-    int frequency = 0;
-
-    switch (index) {
-      case SOUND_SCORE:
-        frequency = 5;
-        buzzerDuration = 20.0f;
-        nextSound = SOUND_SCORE_NEXT;
-        nextSoundDelay = 20.0f;
-        break;
-
-      case SOUND_SCORE_NEXT:
-        frequency = 10;
-        buzzerDuration = 80.0f;
-        break;
-
-      case SOUND_DIE:
-        frequency = 10;
-        buzzerDuration = 1000.0f;
-        break;
-
-      default:
-        frequency = 0;
-        buzzerDuration = 0.0f;
-        break;
-    }
-
-    espert.buzzer.on(frequency);
   }
 }
 
@@ -1070,14 +1135,6 @@ void setScoreImages() {
   }
 }
 
-void setHighScoreImages() {
-  String string = intToString(highScore, 3, "0");
-
-  for (int i = 0; i < 3; i++) {
-    scorePanelHighScoreDigitImage[i] = numberBitmap[string.charAt(i) - '0'];
-  }
-}
-
 void setScorePanelImages(const uint8_t* digitImage[3], int value) {
   String string = intToString(value, 3, "0");
   bool found = false;
@@ -1093,128 +1150,200 @@ void setScorePanelImages(const uint8_t* digitImage[3], int value) {
   }
 }
 
-void checkButtons() {
-  if (isButtonAllowed) {
-    switch (gameMode) {
-      case GAME_MODE_TITLE:
-        break;
+void update() {
+  // game time
+  unsigned long frameTime = millis();
+  elapsedTime = frameTime - lastFrameTime;
+  lastFrameTime = frameTime;
 
-      case GAME_MODE_PLAY:
-        if (pressedButton == 1) {
-        } else if (pressedButton == 2) {
-        }
-        break;
+  // frame rate
+  frameCount++;
+  if (frameTime - fpsLastFrameTime >= 1000l) {
+    frameRate = frameCount;
+    frameCount = 0l;
+    fpsLastFrameTime = frameTime;
+    setFPSImages(frameRate);
+  }
+
+  // button
+  buttonDelay += elapsedTime;
+  if (buttonDelay >= maxButtonDelay) {
+    buttonDelay = 0.0f;
+    pressButtons();
+  }
+
+  // sound
+  if (buzzerDuration > 0.0f) {
+    buzzerDuration -= elapsedTime;
+
+    if (buzzerDuration <= 0.0f) {
+      buzzerDuration = 0.0f;
+      espert.buzzer.off();
+    }
+  } else if (nextSoundDelay > 0.0f) {
+    nextSoundDelay -= elapsedTime;
+
+    if (nextSoundDelay <= 0.0f) {
+      nextSoundDelay = 0.0f;
+      playSound(nextSound);
     }
   }
-}
 
-void changeGameMode(int mode) {
-  switch (mode) {
+  switch (gameMode) {
     case GAME_MODE_TITLE:
-      resetGame();
-      birdPosition.x = (screenSize.x - birdSize.x) * 0.5f;
-      birdDegrees = 1;
-      break;
+      titleTime += elapsedTime;
+
+      if (titleTime >= 5000.0f) {
+        isAutoPlay = true;
+        changeGameMode(GAME_MODE_GET_READY);
+        break;
+      }
 
     case GAME_MODE_GET_READY:
-      resetBird();
-      birdDegrees = 1;
+      updateBirdAnimation(false);
+
+      if (birdPosition.y >= 20 + (gameMode == GAME_MODE_TITLE ? 5 : 0)) {
+        velocity = initialVelocity * 0.7f;
+      }
+
+      if (isAutoPlay) {
+        getReadyTime += elapsedTime;
+
+        if (getReadyTime >= 3000.0f) {
+          changeGameMode(GAME_MODE_PLAY);
+        }
+      }
       break;
 
     case GAME_MODE_PLAY:
+      updateBirdAnimation(true);
+
+      if (isGameOver) {
+        changeGameMode(GAME_MODE_GAME_OVER);
+      } else if (!isHit) {
+        int nearestPipe = -1;
+        float x = screenSize.x * 2.0f;
+
+        for (int i = 0; i < numberOfPipes; i++) {
+          if (isPipeVisibled[i]) {
+            if (isPipeEnabled[i]) {
+              if (isAutoPlay) {
+                if (pipePosition[i].x < x) {
+                  x = pipePosition[i].x;
+                  nearestPipe = i;
+                }
+              }
+
+              if (birdPosition.x + (birdSize.x * 0.5f) >= pipePosition[i].x + (pipeSize.x * 0.5f)) {
+                if (birdPosition.y >= pipePosition[i].y - birdCollisionOffset.y && pipePosition[i].y <= pipePosition[i].y + heightBetweenPipes - birdSize.y + birdCollisionOffset.y) { // between two pipes
+                  addScore(1);
+                  isPipeEnabled[i] = false;
+                  playSound(SOUND_SCORE);
+                }
+              }
+            }
+
+            pipePosition[i].x -= elapsedTime * landSpeed;
+            if (pipePosition[i].x < -pipeSize.x) {
+              isPipeVisibled[i] = false;
+            }
+          }
+        }
+
+        if (isAutoPlay) {
+          if (isDropping && nearestPipe != -1 && isPipeVisibled[nearestPipe]) {
+            float h = 0.73f + (random(0, 48) / 100.0f * ((random(0, 2) == 0) ? 1.0f : -1.0f));
+            if (birdPosition.y > pipePosition[nearestPipe].y + (birdSize.y * h)) {
+              jump();
+            }
+          }
+
+          if (isDropping && birdPosition.y >= landPosition - (birdSize.y * 0.5f * (nearestPipe == -1 ? random(1, 4) : 1))) {
+            jump();
+          }
+        }
+
+        if (pipeRandomTime == 0.0f) {
+          for (int i = 0; i < numberOfPipes; i++) {
+            if (!isPipeVisibled[i]) {
+              isPipeVisibled[i] = true;
+              isPipeEnabled[i] = true;
+              pipePosition[i].x = landOffset.x + (screenSize.x - landOffset.x);
+              pipePosition[i].y = random(pipeRandomFrom, pipeRandomTo);
+              pipeRandomTime = pipeRandomNextTime;
+              break;
+            }
+          }
+        } else {
+          pipeRandomTime -= elapsedTime;
+
+          if (pipeRandomTime <= 0.0f) {
+            pipeRandomTime = 0.0f;
+          }
+        }
+      }
       break;
 
     case GAME_MODE_GAME_OVER:
-      isCheckHighScore = true;
-      gameOverVelocity = initialVelocity * 0.7f;
-      gameOverPosition.x = 32;
-      gameOverPosition.y = 0;
-      scorePanelOffset = maxScorePanelOffset;
-      scorePanelScore = 0;
-      scorePanelHighScore = highScore; // old highscore
-      scorePanelMedalImage = NULL;
-      setScorePanelImages(scorePanelScoreDigitImage, scorePanelScore);
-      setScorePanelImages(scorePanelHighScoreDigitImage, scorePanelHighScore);
-      isButtonAllowed = false;
-      pressedButton = 0;
+      gameOverVelocity += gravity * (elapsedTime / 2000.0f);
+      gameOverPosition.y = constrain(gameOverPosition.y + gameOverVelocity, -64, landPosition);
+
+      if (gameOverVelocity > 0.0f && gameOverPosition.y >= 0.0f) {
+        gameOverPosition.y = 0.0f;
+
+        if (isCheckHighScore && scorePanelOffset != maxScorePanelOffset) {
+          isCheckHighScore = false;
+          checkHighScore();
+        }
+
+        scorePanelOffset = lerp(0.2f, scorePanelOffset, 0.0f);
+
+        if (scorePanelOffset <= 0.1f) {
+          if (!isButtonAllowed) {
+            isButtonAllowed = true;
+            pressedButton = BUTTON_NONE;
+          }
+
+          if (scorePanelScore != score) {
+            float speed = constrain(fabs(scorePanelScore - score), 5.0f, 999.0f);
+            speed *= elapsedTime / 1000.0f;
+
+            if (scorePanelScore < score) {
+              scorePanelScore += speed;
+
+              if (scorePanelScore > score)
+              {
+                scorePanelScore = score;
+              }
+            } else if (scorePanelScore > score) {
+              scorePanelScore -= speed;
+
+              if (scorePanelScore < score) {
+                scorePanelScore = score;
+              }
+            }
+
+            setScorePanelImages(scorePanelScoreDigitImage, scorePanelScore);
+
+            if (isNewHighScore && scorePanelScore > scorePanelHighScore) {
+              scorePanelHighScore = scorePanelScore;
+              setScorePanelImages(scorePanelHighScoreDigitImage, scorePanelHighScore);
+            }
+          }
+        }
+      }
+
+      if (isButtonAllowed && scorePanelScore == score) {
+        gameOverTime += elapsedTime;
+
+        if (gameOverTime >= 5000.0f) {
+          changeGameMode(GAME_MODE_TITLE);
+        }
+      }
       break;
   }
 
-  gameMode = mode;
-}
-
-void checkHighScore() {
-  isNewHighScore = false;
-
-  if (score >= 40) {
-    scorePanelMedalImage = medalBitmap[MEDAL_PLATINUM];
-  } else if (score >= 30) {
-    scorePanelMedalImage = medalBitmap[MEDAL_GOLD];
-  } else if (score >= 20) {
-    scorePanelMedalImage = medalBitmap[MEDAL_SILVER];
-  } else if (score >= 10) {
-    scorePanelMedalImage = medalBitmap[MEDAL_BRONZE];
-  }
-
-  if (score > highScore) {
-    isNewHighScore = true;
-    highScore = score;
-    writeHighScores();
-  }
-}
-
-void addScore(int value) {
-  score = constrain(score + value, 0, 999);
-  setScoreImages();
-}
-
-void initGame() {
-  readHighScores();
-  resetGame();
-  changeGameMode(GAME_MODE_TITLE);
-  lastFrameTime = millis();
-  fpsLastFrameTime = lastFrameTime;
-  setFPSImages(frameRate);
-}
-
-void resetBird() {
-  velocity = 0.0f;
-  birdFrameDirection = 1;
-  birdDegrees = 0.0f;
-  isDropping = false;
-  dropPosition = 0.0f;
-  heightRatio = 0.0f;
-  birdPosition.x = 21;
-  birdPosition.y = (screenSize.y - birdSize.y) * 0.5f;
-  isHit = false;
-  isGameOver = false;
-}
-
-void resetGame() {
-  resetBird();
-  isCheckHighScore = false;
-  score = 0;
-  setScoreImages();
-  buttonDelay = 0.0f;
-  pressedButton = 0;
-  landOffset.x = screenSize.x;
-
-  memset(pipePosition, 0, sizeof(pipePosition));
-  memset(isPipeVisibled, false, sizeof(isPipeVisibled));
-  memset(isPipeEnabled, false, sizeof(isPipeEnabled));
-
-  pipeRandomTime = pipeRandomFirstTime;
-  gameOverVelocity = 0.0f;
-  gameOverPosition.x = 32;
-  gameOverPosition.y = 0;
-  scorePanelOffset = 0.0f;
-  scorePanelScore = 0.0f;
-  scorePanelHighScore = 0.0f;
-  isNewHighScore = false;
-  memset(scorePanelHighScoreDigitImage, NULL, sizeof(scorePanelHighScoreDigitImage));
-  memset(scorePanelScoreDigitImage, NULL, sizeof(scorePanelScoreDigitImage));
-  scorePanelMedalImage = NULL;
-  isButtonAllowed = true;
+  ESP.wdtFeed();
 }
 
 void updateBirdAnimation(bool rotate) {
@@ -1280,53 +1409,10 @@ void updateBirdAnimation(bool rotate) {
   }
 }
 
-void drawBitmap(int x, int y, int width, int height, const uint8_t* bitmap, const uint8_t* mask, int color) {
-  if (mask) {
-    espert.oled.setColor(1 - color);
-    espert.oled.drawBitmap(x, y, width, height, mask, false);
-  }
+void writeHighScore() {
+  int i = eepromAddress;
+  espert.eeprom.write(i, eepromKey);
 
-  espert.oled.setColor(color);
-  espert.oled.drawBitmap(x, y, width, height, bitmap, false);
-}
-
-float lerp(float t, float v0, float v1) {
-  v0 = (1.0f - t) * v0 + t * v1;
-
-  if (fabs(v1 - v0) < 1.0f)
-  {
-    v0 = v1;
-  }
-
-  return v0;
-}
-
-bool isHitPipe() {
-  if (!isHit) {
-    float x1 = birdPosition.x + birdCollisionOffset.x;
-    float y1 = birdPosition.y + birdCollisionOffset.y;
-    float w1 = birdSize.x - (birdCollisionOffset.x * 2.0f);
-    float h1 = birdSize.y - (birdCollisionOffset.y * 2.0f);
-    float w2 = pipeSize.x;
-    float h2 = pipeSize.y;
-
-    for (int i = 0; i < numberOfPipes && !isHit; i++) {
-      if (isPipeVisibled[i]) {
-        float x2 = pipePosition[i].x;
-
-        for (int pipe = 0; pipe < 2 && !isHit; pipe++) {
-          float y2 = pipePosition[i].y + (pipe == 0 ? -pipeSize.y : heightBetweenPipes);
-
-          isHit = !(x1 > x2 + w2 || x1 + w1 < x2 || y1 > y2 + h2 || y1 + h1 < y2);
-
-          if (isHit) {
-            playSound(SOUND_DIE);
-            isButtonAllowed = false;
-          }
-        }
-      }
-    }
-  }
-
-  return isHit;
+  i += eepromKey.length();
+  espert.eeprom.write(i, intToString(highScore, 3, "0"));
 }

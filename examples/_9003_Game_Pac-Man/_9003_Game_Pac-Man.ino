@@ -51,11 +51,11 @@ const uint8_t titleBitmap[] PROGMEM { // title.png
   0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC,
   0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC,
   0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC,
-  0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC,
-  0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC,
-  0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC,
-  0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC,
-  0xF6, 0xF7, 0xFB, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xEC, 0xFC, 0x44, 0x54,
+  0x14, 0xFC, 0x14, 0xFC, 0x1C, 0xDC, 0x3C, 0xDC, 0x1C, 0xFC,
+  0x1C, 0x7C, 0x1C, 0xFC, 0x04, 0xFC, 0x5C, 0x5C, 0x3C, 0xFC,
+  0x04, 0x6C, 0xFC, 0x1C, 0x5C, 0x1C, 0xFC, 0x1C, 0xDC, 0xFC,
+  0xEE, 0xF7, 0xFB, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
   0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
   0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
   0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -406,7 +406,7 @@ typedef struct {
   int column;
 } Tile;
 
-enum {
+typedef enum {
   SOUND_NONE,
   SOUND_EAT_DOT,
   SOUND_EAT_ITEM,
@@ -414,18 +414,18 @@ enum {
   SOUND_EAT_POWER_PELLET,
   SOUND_DIE,
   SOUND_DISAPPEAR
-};
+} SoundType;
 
-enum {
+typedef enum {
   GAME_MODE_TITLE,
   GAME_MODE_READY,
   GAME_MODE_PLAY,
   GAME_MODE_DIE,
   GAME_MODE_SUCCESS,
   GAME_MODE_GAME_OVER
-};
+} GameMode;
 
-enum {
+typedef enum {
   BUTTON_NONE = -1,
   BUTTON_LEFT,
   BUTTON_RIGHT,
@@ -433,31 +433,31 @@ enum {
   BUTTON_DOWN,
   BUTTON_A,
   BUTTON_B
-};
+} ButtonType;
 
-enum {
+typedef enum {
   TILE_TYPE_SPACE,
   TILE_TYPE_DOT,
   TILE_TYPE_POWER_PELLET,
   TILE_TYPE_DOOR = 22
-};
+} TitleType;
 
-enum {
+typedef enum {
   DIRECTION_NONE = -1,
   DIRECTION_LEFT,
   DIRECTION_RIGHT,
   DIRECTION_UP,
   DIRECTION_DOWN
-};
+} MoveDirection;
 
-enum {
+typedef enum {
   GHOST_STATE_WAIT,
   GHOST_STATE_GO,
   GHOST_STATE_RUN,
   GHOST_STATE_DIE
-};
+} GhostState;
 
-enum {
+typedef enum {
   ITEM_CHERRY,
   ITEM_STRAWBERRY,
   ITEM_ORANGE,
@@ -466,11 +466,11 @@ enum {
   ITEM_GALAXIAN,
   ITEM_BELL,
   ITEM_KEY
-};
+} ItemType;
 
 // button
 static const byte numberOfButtons = 6;
-int buttonPin[numberOfButtons] = {12, 13, 14, 15, 0, A0}; // (left, right, up, down, a, b)
+int buttonPin[numberOfButtons] = {12, 13, 14, 2, 0, A0}; // (left, right, up, down, a, b)
 ESPert_Button button[numberOfButtons];
 static const int maxButtonDelay = 10; // milliseconds
 float buttonDelay = 0.0f;
@@ -478,7 +478,7 @@ bool isButtonPressed[numberOfButtons] = {false};
 int pressedButton = BUTTON_NONE;
 
 // sound (buzzer)
-static const int buzzerPin = 2;
+static const int buzzerPin = 15;
 float buzzerDuration = 0.0f;
 bool isSoundEnabled = true;
 bool isSoundInterruptEnabled = true;
@@ -514,6 +514,7 @@ Point gameOverPosition = {0.0f, 0.0f};
 static const int maxBlinkTime = 500;
 float blinkTime = 0.0f;
 float titleTime = 0.0f;
+bool isAutoPlay = false;
 
 // score
 Size numberSize = {5, 7};
@@ -604,6 +605,8 @@ bool isGhostVisibled[numberOfGhosts] = {false};
 float ghostWaitTime[numberOfGhosts] = {0.0f};
 static const float maxGhostRandomTime = 4000.0f;
 float ghostRandomTime[numberOfGhosts] = {0.0f};
+bool isRandomGhostPath[numberOfGhosts] = {false};
+bool isRunaway[numberOfGhosts] = {false};
 int ghostState[numberOfGhosts] = {GHOST_STATE_RUN, GHOST_STATE_WAIT, GHOST_STATE_WAIT, GHOST_STATE_GO};
 static const int ghostMaxPaths = worldHeight * 2;
 Tile ghostPath[numberOfGhosts][ghostMaxPaths] = {{0, 0}};
@@ -617,7 +620,7 @@ String ghostEdiblePointString = "";
 Size ghostEdiblePointSize = {0, 0};
 Point ghostEdiblePointPosition = {0.0f, 0.0f};
 int ghostEdiblePointGhost = -1;
-static const Tile runAwayCornerTile[4] = {{1, 1}, {1, 19}, {25, 1}, {25, 19}}; // upper left, upper right, lower left, lower right
+static const Tile cornerTile[4] = {{1, 1}, {1, 19}, {25, 1}, {25, 19}}; // upper left, upper right, lower left, lower right
 
 // function prototypes
 void addDotCounter(int value);
@@ -629,6 +632,7 @@ void drawBitmap(int x, int y, int width, int height, const uint8_t* bitmap, cons
 void eat(Tile tile);
 void eatGhost(int i);
 void eatPowerPellet();
+void exitAutoPlay();
 int getDirection(Tile fromTile, Tile toTile);
 Point getPositionFromTile(Tile tilePos, Size size);
 Tile getTileFromPosition(Point pos, Size size);
@@ -645,7 +649,7 @@ bool pathFinding(int i, Tile targetTile, bool isDoorTileEnabled = true);
 void playSound(int index);
 void pressButtons();
 bool readGhostPath(int i);
-void readHighScores();
+void readHighScore();
 void render();
 void renderEdibleGhost();
 void renderFPS();
@@ -659,10 +663,11 @@ void resetGame();
 void resetGhostPath(int i);
 void resetPacManIncreseSpeed();
 void restartLevel();
-void runAwayGhost(int i);
+bool randomGhostPath(int i);
 void scrollWorldToPacManPosition();
 void scrollWorldToPosition(float y);
 void setFPSImages(int value);
+void setRandomGhostPath(int i, bool runaway);
 void spawnGhost(int i, Tile tile, int state, int direction, int waitTime = 0.0f);
 String toString(unsigned long value, int length, String prefixChar = "0");
 void update();
@@ -678,12 +683,12 @@ void setup() {
   randomSeed(analogRead(0));
 
   for (int i = 0; i < numberOfButtons; i++) {
-    button[i].init(buttonPin[i], INPUT_PULLUP);
+    if (buttonPin[i] != -1) {
+      button[i].init(buttonPin[i], INPUT_PULLUP);
+    }
   }
 
   initGame();
-  espert.buzzer.on(1);
-  espert.buzzer.on(0);
 }
 
 void loop() {
@@ -842,9 +847,14 @@ void eatPowerPellet() {
   for (int i = 0; i < numberOfGhosts; i++) {
     if (ghostState[i] != GHOST_STATE_DIE) {
       isGhostEdible[i] = true;
-      runAwayGhost(i);
+      setRandomGhostPath(i, true);
     }
   }
+}
+
+void exitAutoPlay() {
+  readHighScore();
+  changeGameMode(GAME_MODE_TITLE);
 }
 
 int getDirection(Tile fromTile, Tile toTile) {
@@ -869,8 +879,8 @@ int getDirection(Tile fromTile, Tile toTile) {
 
 Point getPositionFromTile(Tile tile, Size size) {
   Point pos = {0, 0};
-  pos.y = (tile.row * tileSize.height) + ((tileSize.height - size.height) * 0.5f);
-  pos.x = (tile.column * tileSize.width) + ((tileSize.width - size.width) * 0.5f);
+  pos.y = round((tile.row * tileSize.height) + ((tileSize.height - size.height) * 0.5f));
+  pos.x = round((tile.column * tileSize.width) + ((tileSize.width - size.width) * 0.5f));
   return pos;
 }
 
@@ -892,12 +902,14 @@ void ghostDie(int i) {
 }
 
 void initGame() {
-  readHighScores();
+  readHighScore();
   resetGame();
   changeGameMode(GAME_MODE_TITLE);
   lastFrameTime = millis();
   fpsLastFrameTime = lastFrameTime;
   setFPSImages(frameRate);
+  espert.buzzer.on(1);
+  espert.buzzer.on(0);
 }
 
 bool isBlink(float factor) {
@@ -1048,7 +1060,7 @@ bool pathFinding(int i, Tile targetTile, bool isDoorTileEnabled) {
 }
 
 void playSound(int index) {
-  if (isSoundEnabled && isSoundInterruptEnabled) {
+  if (!isAutoPlay && isSoundEnabled && isSoundInterruptEnabled) {
     nextSound = SOUND_NONE;
     nextSoundDelay = 0.0f;
     int frequency = 0;
@@ -1081,100 +1093,111 @@ void playSound(int index) {
 
 void pressButtons() {
   for (int i = 0; i < numberOfButtons; i++) {
-    bool isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
+    if (buttonPin[i] != -1) {
+      bool isPressed = false;
 
-    if (isPressed != isButtonPressed[i]) {
-      isButtonPressed[i] = isPressed;
+      if (buttonPin[i] == A0) {
+        isPressed = (analogRead(buttonPin[i]) < 512) ? true : false;
+      } else {
+        isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
+      }
 
-      if (isPressed) {
-        pressedButton = i;
+      if (isPressed != isButtonPressed[i]) {
+        isButtonPressed[i] = isPressed;
 
-        switch (gameMode) {
-          case GAME_MODE_READY:
-          case GAME_MODE_PLAY:
-            if (pressedButton == BUTTON_LEFT || pressedButton == BUTTON_RIGHT || pressedButton == BUTTON_UP || pressedButton == BUTTON_DOWN) {
-              pacManNextDirection = pressedButton;
+        if (isPressed) {
+          pressedButton = i;
 
-              if (pacManDirection != pacManNextDirection) {
-                if (pacManNextDirection == DIRECTION_RIGHT) {
-                  if (isPacManStoped) {
-                    Tile tile = pacManTile;
+          if (!isAutoPlay && (gameMode == GAME_MODE_READY || gameMode == GAME_MODE_PLAY) && (pressedButton == BUTTON_LEFT || pressedButton == BUTTON_RIGHT || pressedButton == BUTTON_UP || pressedButton == BUTTON_DOWN)) {
+            pacManNextDirection = pressedButton;
 
-                    if (tile.column < numberOfColumns - 1) {
-                      tile.column++;
-                    }
+            if (pacManDirection != pacManNextDirection) {
+              if (pacManNextDirection == DIRECTION_RIGHT) {
+                if (isPacManStoped) {
+                  Tile tile = pacManTile;
 
-                    if (!isWallTile(tile)) {
-                      pacManDirection = pacManNextDirection;
-                      isPacManStoped = false;
-                    } else {
-                      pacManNextDirection = pacManDirection;
-                    }
+                  if (tile.column < numberOfColumns - 1) {
+                    tile.column++;
+                  }
+
+                  if (!isWallTile(tile)) {
+                    pacManDirection = pacManNextDirection;
+                    isPacManStoped = false;
+                  } else {
+                    pacManNextDirection = pacManDirection;
                   }
                 }
-                else if (pacManNextDirection == DIRECTION_LEFT) {
-                  if (isPacManStoped) {
-                    Tile tile = pacManTile;
+              } else if (pacManNextDirection == DIRECTION_LEFT) {
+                if (isPacManStoped) {
+                  Tile tile = pacManTile;
 
-                    if (tile.column > 0) {
-                      tile.column--;
-                    }
+                  if (tile.column > 0) {
+                    tile.column--;
+                  }
 
-                    if (!isWallTile(tile)) {
-                      pacManDirection = pacManNextDirection;
-                      isPacManStoped = false;
-                    } else {
-                      pacManNextDirection = pacManDirection;
-                    }
+                  if (!isWallTile(tile)) {
+                    pacManDirection = pacManNextDirection;
+                    isPacManStoped = false;
+                  } else {
+                    pacManNextDirection = pacManDirection;
                   }
                 }
-                else if (pacManNextDirection == DIRECTION_DOWN) {
-                  if (isPacManStoped) {
-                    Tile tile = pacManTile;
+              } else if (pacManNextDirection == DIRECTION_DOWN) {
+                if (isPacManStoped) {
+                  Tile tile = pacManTile;
 
-                    if (tile.row < numberOfRows - 1) {
-                      tile.row++;
-                    }
+                  if (tile.row < numberOfRows - 1) {
+                    tile.row++;
+                  }
 
-                    if (!isWallTile(tile)) {
-                      pacManDirection = pacManNextDirection;
-                      isPacManStoped = false;
-                    } else {
-                      pacManNextDirection = pacManDirection;
-                    }
+                  if (!isWallTile(tile)) {
+                    pacManDirection = pacManNextDirection;
+                    isPacManStoped = false;
+                  } else {
+                    pacManNextDirection = pacManDirection;
                   }
                 }
-                else if (pacManNextDirection == DIRECTION_UP) {
-                  if (isPacManStoped) {
-                    Tile tile = pacManTile;
+              } else if (pacManNextDirection == DIRECTION_UP) {
+                if (isPacManStoped) {
+                  Tile tile = pacManTile;
 
-                    if (tile.row > 0) {
-                      tile.row--;
-                    }
+                  if (tile.row > 0) {
+                    tile.row--;
+                  }
 
-                    if (!isWallTile(tile)) {
-                      pacManDirection = pacManNextDirection;
-                      isPacManStoped = false;
-                    } else {
-                      pacManNextDirection = pacManDirection;
-                    }
+                  if (!isWallTile(tile)) {
+                    pacManDirection = pacManNextDirection;
+                    isPacManStoped = false;
+                  } else {
+                    pacManNextDirection = pacManDirection;
                   }
                 }
               }
             }
-            break;
-        }
-      } else if (pressedButton == i) {
-        if (gameMode == GAME_MODE_TITLE) {
-          newLevel();
-          changeGameMode(GAME_MODE_READY);
-        } else if (gameMode == GAME_MODE_GAME_OVER) {
-          changeGameMode(GAME_MODE_TITLE);
-        }
+          }
+        } else if (pressedButton == i) {
+          if (pressedButton == BUTTON_A || pressedButton == BUTTON_B) {
+            if (isAutoPlay) {
+              if (gameMode != GAME_MODE_TITLE) {
+                readHighScore();
+                resetGame();
+                newLevel();
+                changeGameMode(GAME_MODE_READY);
+              }
+            } else {
+              if (gameMode == GAME_MODE_TITLE) {
+                newLevel();
+                changeGameMode(GAME_MODE_READY);
+              } else if (gameMode == GAME_MODE_GAME_OVER) {
+                changeGameMode(GAME_MODE_TITLE);
+              }
+            }
+          }
 
-        pressedButton = BUTTON_NONE;
+          pressedButton = BUTTON_NONE;
+        }
+        break;
       }
-      break;
     }
   }
 }
@@ -1209,7 +1232,7 @@ bool readGhostPath(int i) {
   return found;
 }
 
-void readHighScores() {
+void readHighScore() {
   int i = eepromAddress;
 
   if (espert.eeprom.read(i, eepromKey.length()) == eepromKey) {
@@ -1377,7 +1400,7 @@ void renderTitle() {
     }
   }
 
-  if (titleTime >= 3250.0f) {
+  if (!isAutoPlay && titleTime >= 3250.0f) {
     float t = 3500.0f;
 
     if (titleTime > t) {
@@ -1460,6 +1483,7 @@ void renderWorld() {
 }
 
 void resetGame() {
+  isAutoPlay = false;
   level = 0;
   score = 0l;
   isAwardExtraLife = false;
@@ -1501,7 +1525,7 @@ void restartLevel() {
   worldStartPosition = worldPosition.y;
   worldPosition.y = 0.0f;
   pacManDirection = DIRECTION_LEFT;
-  pacManNextDirection = pacManDirection;
+  pacManNextDirection = pacManDirection + (isAutoPlay ? random(0, 2) : 0);
   pacManFrame = 0.0f;
   isPacManStoped = false;
   isPacManVisibled = false;
@@ -1534,48 +1558,54 @@ void restartLevel() {
     isGhostVisibled[i] = false;
     isGhostEdible[i] = false;
     ghostRandomTime[i] = maxGhostRandomTime;
+    isRandomGhostPath[i] = false;
+    isRunaway[i] = false;
     resetGhostPath(i);
   }
 }
 
-void runAwayGhost(int i) {
-  if (ghostState[i] == GHOST_STATE_RUN) {
-    if (isJustMoveToNewTile(ghostTile[i], ghostLastTile[i])) {
-      ghostPosition[i] = getPositionFromTile(ghostLastTile[i], ghostSize);
-    } else {
-      ghostPosition[i] = getPositionFromTile(ghostTile[i], ghostSize);
-    }
+bool randomGhostPath(int i) {
+  if (isRandomGhostPath[i]) {
+    isRandomGhostPath[i] = false;
+    ghostTile[i] = ghostLastTile[i];
+    ghostPosition[i] = getPositionFromTile(ghostTile[i], ghostSize);
 
+    // find pac-man area
     int pacManCorner = 0;
-
-    // find pac-man corner position
-    if (pacManTile.row <= numberOfRows * 0.5f) { // upper
-      if (pacManTile.column <= numberOfColumns * 0.5f) { // left
-        pacManCorner = 0;
-      } else { // right
-        pacManCorner = 1;
-      }
-    } else { // lower
-      if (pacManTile.column <= numberOfColumns * 0.5f) { // left
-        pacManCorner = 2;
-      } else { // right
-        pacManCorner = 3;
+    if (isRunaway[i]) {
+      if (pacManTile.row <= numberOfRows * 0.5f) { // upper
+        if (pacManTile.column <= numberOfColumns * 0.5f) { // left
+          pacManCorner = 0;
+        } else { // right
+          pacManCorner = 1;
+        }
+      } else { // lower
+        if (pacManTile.column <= numberOfColumns * 0.5f) { // left
+          pacManCorner = 2;
+        } else { // right
+          pacManCorner = 3;
+        }
       }
     }
 
     int availabledCorners[3] = {0};
     int n = 0;
     for (int corner = 0; corner < 4; corner++) {
-      if (corner != pacManCorner) {
+      if (!isRunaway[i] || (isRunaway[i] && corner != pacManCorner)) {
         availabledCorners[n++] = corner;
       }
     }
 
+    isRunaway[i] = false;
     int ghostCorner = random(0, 3); // random 0 to 2
-    if (pathFinding(i, runAwayCornerTile[availabledCorners[ghostCorner]])) {
+    if (pathFinding(i, cornerTile[availabledCorners[ghostCorner]])) {
       readGhostPath(i);
     }
+
+    return true;
   }
+
+  return false;
 }
 
 void scrollWorldToPacManPosition() {
@@ -1611,6 +1641,15 @@ void setFPSImages(int value) {
     for (int i = 0; i < 2; i++) {
       fpsDigitImage[i] = numberBitmap[fpsString.charAt(i) - '0'];
     }
+  }
+}
+
+void setRandomGhostPath(int i, bool runaway) {
+  if (ghostState[i] == GHOST_STATE_RUN) {
+    resetGhostPath(i);
+    ghostRandomTime[i] = 0.0f;
+    isRandomGhostPath[i] = true;
+    isRunaway[i] = runaway;
   }
 }
 
@@ -1724,11 +1763,15 @@ void update() {
           }
 
           if (pacManDieFrame == -1.0f && pacManDieTime > 5000.0f) {
-            if (numberOfPacManLives == 0) {
-              changeGameMode(GAME_MODE_GAME_OVER);
+            if (isAutoPlay) {
+              exitAutoPlay();
             } else {
-              restartLevel();
-              changeGameMode(GAME_MODE_READY);
+              if (numberOfPacManLives == 0) {
+                changeGameMode(GAME_MODE_GAME_OVER);
+              } else {
+                restartLevel();
+                changeGameMode(GAME_MODE_READY);
+              }
             }
             break;
           }
@@ -1740,13 +1783,17 @@ void update() {
           pacManFrame = numberOfPacManFrames - 1;
 
           if (successTime > 5000.0f) {
-            if (++level >= numberOfLevels) {
-              level = 0;
-            }
+            if (isAutoPlay) {
+              exitAutoPlay();
+            } else {
+              if (++level >= numberOfLevels) {
+                level = 0;
+              }
 
-            numberOfPacManLives++;
-            newLevel();
-            changeGameMode(GAME_MODE_READY);
+              numberOfPacManLives++;
+              newLevel();
+              changeGameMode(GAME_MODE_READY);
+            }
             break;
           }
         }
@@ -1903,10 +1950,11 @@ void updateGhost() {
           }
         } else if (ghostState[i] == GHOST_STATE_GO) {
           if (ghostDirection[i] == DIRECTION_UP) {
+            ghostState[i] = GHOST_STATE_RUN;
             ghostDirection[i] = DIRECTION_LEFT + random(0, 2); // random 0 to 1
             ghostNextDirection[i] = ghostDirection[i];
-            ghostState[i] = GHOST_STATE_RUN;
             ghostRandomTime[i] = maxGhostRandomTime;
+            setRandomGhostPath(i, false);
           } else {
             ghostDirection[i] = DIRECTION_UP;
             ghostNextDirection[i] = ghostDirection[i];
@@ -1947,7 +1995,7 @@ void updateGhost() {
             // change direction while running
             if (ghostLastTile[i].row >= 0 && ghostLastTile[i].row < numberOfRows && ghostLastTile[i].column >= 0 && ghostLastTile[i].column < numberOfColumns) {
               if (isJustMoveToNewTile(ghostTile[i], ghostLastTile[i])) {
-                if (random(0, 2) == 0) { // random 0 to 1
+                if (!randomGhostPath(i) && random(0, 2) == 0) { // random 0 to 1
                   ghostRandomTime[i] = maxGhostRandomTime;
                   int n = random(0, 3); // random 0 to 2
 
@@ -2097,6 +2145,31 @@ void updatePacMan() {
       }
     }
 
+    if (isAutoPlay) { // change direction
+      int n = random(0, (isHitWall && isPacManStoped) ? 2 : 100);
+
+      if (n < 2) {
+        if (pacManDirection == DIRECTION_LEFT || pacManDirection == DIRECTION_RIGHT) {
+          pacManNextDirection = DIRECTION_UP + n;
+
+          if (!isTileAvailabled(pacManNextDirection, pacManTile)) {
+            pacManNextDirection = DIRECTION_UP + (1 - n);
+          }
+        } else {
+          pacManNextDirection = DIRECTION_LEFT + n;
+
+          if (!isTileAvailabled(pacManNextDirection, pacManTile)) {
+            pacManNextDirection = DIRECTION_LEFT + (1 - n);
+          }
+        }
+
+        if (isHitWall && isPacManStoped) {
+          pacManDirection = pacManNextDirection;
+          isPacManStoped = false;
+        }
+      }
+    }
+
     pacManLastTile = pacManTile;
     scrollWorldToPacManPosition();
   }
@@ -2109,7 +2182,10 @@ void updateTitle() {
   float speed = gameNormalSpeed * 1.5f;
   titleTime += elapsedTime;
 
-  if (titleTime > 13420.0f) {
+  if (isAutoPlay && titleTime > 22547.0f) {
+    newLevel();
+    changeGameMode(GAME_MODE_READY);
+  } else if (titleTime > 13420.0f) {
     if (ghostEdiblePointVisibledTime == 0.0f) {
       pacManFrame += elapsedTime * pacManAnimationSpeed;
 
@@ -2131,8 +2207,8 @@ void updateTitle() {
         ghostEdiblePointGhost = -1;
 
         if (ghostEdiblePointIndex == numberOfGhosts) {
-          changeGameMode(GAME_MODE_TITLE);
           finished = true;
+          isAutoPlay = true;
         }
       }
     }
@@ -2169,9 +2245,11 @@ void updateTitle() {
 }
 
 void writeHighScore() {
-  int i = eepromAddress;
-  espert.eeprom.write(i, eepromKey);
+  if (!isAutoPlay) {
+    int i = eepromAddress;
+    espert.eeprom.write(i, eepromKey);
 
-  i += eepromKey.length();
-  espert.eeprom.write(i, toString(highScore, String(maxScore).length(), "0"));
+    i += eepromKey.length();
+    espert.eeprom.write(i, toString(highScore, String(maxScore).length(), "0"));
+  }
 }

@@ -1,19 +1,37 @@
-// Breakout for ESPresso Lite
+// Breakout Simulator for ESPresso Lite
 
 #include <ESPert.h>
 ESPert espert;
 
-// button pin
+// button
+typedef enum {
+  BUTTON_NONE = -1,
+  BUTTON_LEFT,
+  BUTTON_RIGHT,
+  BUTTON_UP,
+  BUTTON_DOWN,
+  BUTTON_A,
+  BUTTON_B
+} ButtonType;
+
+static const byte numberOfButtons = 6;
+int gamepadPin[numberOfButtons] = {12, 13, 14, 2, 0, A0}; // (left, right, up, down, a, b)
+bool isGamepadEnabled = true;
+
 #ifdef ARDUINO_ESP8266_ESPRESSO_LITE_V1
-int buttonPin[2] = {0, 2};
+int buttonPin[numberOfButtons] = {0, 2, -1, -1, -1, -1}; // USER, FLASH
 #else
-int buttonPin[2] = {0, 13};
+int buttonPin[numberOfButtons] = {0, 13, -1, -1, -1, -1}; // GPIO0, GPIO13
 #endif
-int gamepadPin[2] = {14, 1};
-bool isGamepadEnabled = false;
+
+ESPert_Button button[numberOfButtons];
+static const int maxButtonDelay = 10; // milliseconds
+float buttonDelay = 0.0f;
+bool isButtonPressed[numberOfButtons] = {false};
+int pressedButton = BUTTON_NONE;
 
 // sound (buzzer)
-static const int buzzerPin = 12;
+static const int buzzerPin = isGamepadEnabled ? 15 : 12;
 float buzzerDuration = 0.0f;
 bool isSoundEnabled = true;
 
@@ -81,22 +99,58 @@ const uint8_t brickBitmap[4][16] PROGMEM {
 };
 
 const uint8_t breakoutBitmap[] PROGMEM = { // breakout.png
-  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x0B, 0x15, 0xAB,
-  0xD5, 0xEA, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0x0F, 0x01, 0x01, 0x31, 0x39, 0x39, 0x39, 0x19, 0x01, 0x43, 0xC3, 0xFF, 0x7F, 0x0F, 0x01, 0x01, 0x71, 0x79, 0x79, 0x79,
-  0x39, 0x01, 0x01, 0xC3, 0xFF, 0x7F, 0x0F, 0x01, 0x01, 0x31, 0x39, 0x39, 0x39, 0x39, 0x39, 0x39, 0xF9, 0xFF, 0xFF, 0x7F, 0x1F, 0x0F, 0x83, 0xC1, 0xF1, 0x01, 0x01, 0x0F, 0xFF, 0xFF, 0x7F, 0x0F,
-  0x01, 0x01, 0x71, 0x3F, 0x1F, 0x0F, 0x07, 0xE3, 0xF1, 0xF9, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0x1F, 0x07, 0x03, 0x63, 0xF1, 0xF1, 0x61, 0x01, 0x02, 0x02, 0x04, 0x18, 0xF0, 0xFC, 0x1E, 0x01, 0x01,
-  0xE1, 0xFF, 0xFF, 0xFF, 0xFF, 0x1F, 0x01, 0x01, 0xE1, 0xFF, 0xFB, 0xF1, 0xF1, 0x11, 0x01, 0x01, 0xE1, 0xF1, 0xF1, 0xF1, 0xF9, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC3, 0xC0, 0xC0, 0x40, 0x48, 0x4F, 0x4F, 0x4F, 0x4F, 0x47, 0x40, 0x60, 0x70, 0x7F, 0x40, 0x40, 0x40, 0x78, 0x7E, 0x7E, 0x7C, 0x70,
-  0x41, 0x43, 0x4F, 0x7F, 0x7F, 0x40, 0x40, 0x40, 0x48, 0x4F, 0x4F, 0x4F, 0x4F, 0x4F, 0x4F, 0x7F, 0x5F, 0x47, 0x41, 0x60, 0x78, 0x78, 0x79, 0x79, 0x79, 0x78, 0x40, 0x40, 0x43, 0x7F, 0x40, 0x40,
-  0x40, 0x78, 0x7C, 0x7E, 0x7F, 0x7C, 0x70, 0xC0, 0xC3, 0x4F, 0xBF, 0x1F, 0x0F, 0x07, 0x03, 0x06, 0x88, 0xD0, 0x70, 0x60, 0x60, 0x64, 0x62, 0x70, 0x70, 0x78, 0x7E, 0x7F, 0x7F, 0x70, 0x60, 0x40,
-  0x4F, 0x4F, 0x4F, 0x4F, 0x63, 0x60, 0x70, 0x7C, 0x7F, 0x7F, 0x7F, 0x47, 0x40, 0x40, 0x40, 0x78, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4,
-  0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4,
-  0xF4, 0xF4, 0xF4, 0xFC, 0xFC, 0xFE, 0xEF, 0xD5, 0xEA, 0xF5, 0xEA, 0xF5, 0xFA, 0xFC, 0xF6, 0xF7, 0xF5, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4,
-  0xF4, 0xF4, 0xF4, 0xF4, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0x3F,
+  0x1F, 0x0F, 0x07, 0x0B, 0x15, 0xAB, 0xD5, 0xEA, 0xFD, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F,
+  0x0F, 0x01, 0x01, 0x31, 0x39, 0x39, 0x39, 0x19, 0x01, 0x43,
+  0xC3, 0xFF, 0x7F, 0x0F, 0x01, 0x01, 0x71, 0x79, 0x79, 0x79,
+  0x39, 0x01, 0x01, 0xC3, 0xFF, 0x7F, 0x0F, 0x01, 0x01, 0x31,
+  0x39, 0x39, 0x39, 0x39, 0x39, 0x39, 0xF9, 0xFF, 0xFF, 0x7F,
+  0x1F, 0x0F, 0x83, 0xC1, 0xF1, 0x01, 0x01, 0x0F, 0xFF, 0xFF,
+  0x7F, 0x0F, 0x01, 0x01, 0x71, 0x3F, 0x1F, 0x0F, 0x07, 0xE3,
+  0xF1, 0xF9, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0x1F, 0x07, 0x03,
+  0x63, 0xF1, 0xF1, 0x61, 0x01, 0x02, 0x02, 0x04, 0x18, 0xF0,
+  0xFC, 0x1E, 0x01, 0x01, 0xE1, 0xFF, 0xFF, 0xFF, 0xFF, 0x1F,
+  0x01, 0x01, 0xE1, 0xFF, 0xFB, 0xF1, 0xF1, 0x11, 0x01, 0x01,
+  0xE1, 0xF1, 0xF1, 0xF1, 0xF9, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC3, 0xC0, 0xC0, 0x40,
+  0x48, 0x4F, 0x4F, 0x4F, 0x4F, 0x47, 0x40, 0x60, 0x70, 0x7F,
+  0x40, 0x40, 0x40, 0x78, 0x7E, 0x7E, 0x7C, 0x70, 0x41, 0x43,
+  0x4F, 0x7F, 0x7F, 0x40, 0x40, 0x40, 0x48, 0x4F, 0x4F, 0x4F,
+  0x4F, 0x4F, 0x4F, 0x7F, 0x5F, 0x47, 0x41, 0x60, 0x78, 0x78,
+  0x79, 0x79, 0x79, 0x78, 0x40, 0x40, 0x43, 0x7F, 0x40, 0x40,
+  0x40, 0x78, 0x7C, 0x7E, 0x7F, 0x7C, 0x70, 0xC0, 0xC3, 0x4F,
+  0xBF, 0x1F, 0x0F, 0x07, 0x03, 0x06, 0x88, 0xD0, 0x70, 0x60,
+  0x60, 0x64, 0x62, 0x70, 0x70, 0x78, 0x7E, 0x7F, 0x7F, 0x70,
+  0x60, 0x40, 0x4F, 0x4F, 0x4F, 0x4F, 0x63, 0x60, 0x70, 0x7C,
+  0x7F, 0x7F, 0x7F, 0x47, 0x40, 0x40, 0x40, 0x78, 0x7F, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFC, 0xFC, 0xFC,
+  0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC,
+  0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4,
+  0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4,
+  0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4,
+  0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4, 0xF4,
+  0xF4, 0xFC, 0xFC, 0xFE, 0xEF, 0xD5, 0xEA, 0xF5, 0xEA, 0xF5,
+  0xFA, 0xFC, 0xFE, 0x47, 0x55, 0x14, 0xFC, 0x14, 0xFC, 0x1C,
+  0xDC, 0x3C, 0xDC, 0x1C, 0xFC, 0x1C, 0x7C, 0x1C, 0xFC, 0x04,
+  0xFC, 0x5C, 0x5C, 0x3C, 0xFC, 0x04, 0x6C, 0xFC, 0x1C, 0x5C,
+  0x1C, 0xFC, 0x1C, 0xDC, 0xFC, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF
 };
 
 const uint8_t bulletBitmap[2][8] PROGMEM {
@@ -215,7 +269,7 @@ const uint8_t wallBitmap[] PROGMEM = { // wall.png
   0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 };
 
-enum {
+typedef enum {
   GAME_MODE_TITLE,
   GAME_MODE_TITLE_BLINK,
   GAME_MODE_GET_READY,
@@ -223,34 +277,27 @@ enum {
   GAME_MODE_MISS,
   GAME_MODE_LEVEL_CLEARED,
   GAME_MODE_GAME_OVER
-};
+} GameMode;
 
-enum {
+typedef enum {
   SOUND_LAUNCH_BALL,
   SOUND_HIT_PADDLE,
   SOUND_HIT_BORDER,
   SOUND_HIT_BLOCK,
   SOUND_MISS
-};
+} SoundType;
 
-enum {
+typedef enum {
   ITEM_TYPE_NONE,
   ITEM_TYPE_EXPAND,
   ITEM_TYPE_BALL,
   ITEM_TYPE_BULLET
-};
+} ItemType;
 
-struct Point {
+typedef struct {
   float x;
   float y;
-};
-
-// button
-ESPert_Button button[2];
-static const int maxButtonDelay = 10; // milliseconds
-float buttonDelay = 0.0f;
-bool isButtonPressed[2] = {false};
-int pressedButton = 0;
+} Point;
 
 // game time
 unsigned long lastFrameTime = 0l;
@@ -267,7 +314,7 @@ Point fpsDigitPosition[2] = {{120, 1}, {124, 1}};
 static const float maxTitleBlinkTime = 3000.0f;
 static const float maxGetReadyTime = 6000.0f;
 static const float maxMissTime = 3000.0f;
-static const float maxGameOverTimeOut = 10000.0f;
+static const float maxGameOverTimeOut = 5000.0f;
 static const float maxLevelClearedTime = 3000.0f;
 int screenRect[4] = {1, 7, 126, 63}; // left, top, right, bottom
 int gameMode = GAME_MODE_TITLE;
@@ -279,6 +326,10 @@ float gameOverTimeOut = 0.0f;
 float levelClearedTime = 0.0f;
 bool isReadyToPlay = false;
 int infoY = 8;
+float titleTime = 0.0f;
+bool isAutoPlay = false;
+float autoPlayPaddlePosition = -1.0f;
+float autoPlayPaddleLerpSpeed = 0.02f;
 
 // paddle
 static const float paddleSpeed = 150.0f / 1000.0f;
@@ -364,28 +415,31 @@ static const float maxAddBallBlinkTime = 3000.0f;
 float addBallBlinkTime = 0.0f;
 
 // function prototypes
-void update();
-void render();
-void pressButtons();
+void addBall(int value);
+void addScore(int value);
+void changeGameMode(int mode);
 void checkButtons();
 void checkHighScore();
-void readHighScores();
-void writeHighScores();
+void deleteItem(int i);
+void initGame();
 String intToString(int value, int length, String prefixChar = "0");
+bool isHitBrick(int x, int y, int width, int height, int directionX, int directionY, int ball = -1);
+float lerp(float t, float v0, float v1);
+void loadLevel();
+void playLoop();
 void playSound(int index);
-void setScoreImages();
+void pressButtons();
+void readHighScore();
+void render();
+void resetGame();
+void setBallImages();
+void setFPSImages(int value);
 void setHighScoreImages();
 void setLevelImages();
-void setBallImages();
-void initGame();
-void playLoop();
-void changeGameMode(int mode);
-void loadLevel();
+void setScoreImages();
+void update();
 void updatePaddle();
-bool isHitBrick(int x, int y, int width, int height, int directionX, int directionY, int ball = -1);
-void addScore(int value);
-void addBall(int value);
-void deleteItem(int i);
+void writeHighScore();
 
 void setup() {
   espert.init();
@@ -393,12 +447,14 @@ void setup() {
   espert.buzzer.init(buzzerPin);
   randomSeed(analogRead(0));
 
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < numberOfButtons; i++) {
     if (isGamepadEnabled) {
       buttonPin[i] = gamepadPin[i];
     }
 
-    button[i].init(buttonPin[i]);
+    if (buttonPin[i] != -1) {
+      button[i].init(buttonPin[i], INPUT_PULLUP);
+    }
   }
 
   initGame();
@@ -409,287 +465,150 @@ void loop() {
   render();
 }
 
-void update() {
-  // game time
-  unsigned long frameTime = millis();
-  elapsedTime = frameTime - lastFrameTime;
-  lastFrameTime = frameTime;
+void addBall(int value) {
+  ballLeft = constrain(ballLeft + value, 0, 9);
+  setBallImages();
+}
 
-  // frame rate
-  frameCount++;
-  if (frameTime - fpsLastFrameTime >= 1000l) {
-    frameRate = frameCount;
-    frameCount = 0l;
-    fpsLastFrameTime = frameTime;
-    setFPSImages(frameRate);
-  }
+void addScore(int value) {
+  score = constrain(score + value, 0, 9999);
+  setScoreImages();
+}
 
-  // button
-  buttonDelay += elapsedTime;
-  if (buttonDelay >= maxButtonDelay) {
-    buttonDelay = 0.0f;
-    pressButtons();
-  }
-  checkButtons();
-
-  // sound
-  if (buzzerDuration > 0.0f) {
-    buzzerDuration -= elapsedTime;
-
-    if (buzzerDuration <= 0.0f) {
-      buzzerDuration = 0.0f;
-      espert.buzzer.off();
-    }
-  }
-
-  switch (gameMode) {
+void changeGameMode(int mode) {
+  switch (mode) {
     case GAME_MODE_TITLE:
+      resetGame();
       break;
 
     case GAME_MODE_TITLE_BLINK:
-      if (titleBlinkTime < maxTitleBlinkTime) {
-        titleBlinkTime += elapsedTime;
-
-        if (titleBlinkTime >= maxTitleBlinkTime) {
-          changeGameMode(GAME_MODE_GET_READY);
-        }
-      }
+      titleBlinkTime = 0.0f;
       break;
 
     case GAME_MODE_GET_READY:
-      if (getReadyTime < maxGetReadyTime) {
-        getReadyTime += elapsedTime;
-
-        if (rowCount < numberOfRows && getReadyTime <= 1500.0f) {
-          if ((int)getReadyTime % 300 < 150) {
-            if (!isUpdateRowCounter) {
-              isUpdateRowCounter = true;
-              rowCount++;
-            }
-          } else {
-            isUpdateRowCounter = false;
-          }
-        } else if (!isReadyToPlay && getReadyTime > 1500.0f) {
-          isReadyToPlay = true;
-
-          if (miss) {
-            if (ballLeft > 0) {
-              ballLeft--;
-            }
-
-            setBallImages();
-            miss = false;
-          }
-        } else if (getReadyTime >= maxGetReadyTime) {
-          changeGameMode(GAME_MODE_PLAY);
+      if (gameMode == GAME_MODE_TITLE_BLINK) {
+        if (isAutoPlay) {
+          level = random(0, numberOfLevels);
         }
+
+        loadLevel();
       }
+
+      isReadyToPlay = false;
+      autoPlayPaddlePosition = -1.0f;
+      setScoreImages();
+      setBallImages();
+      getReadyTime = 0.0f;
+      missTime = 0.0f;
+      ballPosition[mainBall][0] = paddlePosition.x - (ballSize.x * 0.5f);
+      ballPosition[mainBall][1] = paddlePosition.y - ballSize.y - 1;
+      ballDirection[mainBall][0] = 1;
+      ballDirection[mainBall][1] = -1;
+      memset(&isBallCollide, false, sizeof(isBallCollide));
       break;
 
     case GAME_MODE_PLAY:
-      playLoop();
+      playSound(SOUND_LAUNCH_BALL);
+      getReadyTime = maxGetReadyTime;
       break;
 
     case GAME_MODE_MISS:
-      if (missTime < maxMissTime) {
-        missTime += elapsedTime;
-
-        if (missTime >= maxMissTime) {
-          changeGameMode((ballLeft == 0) ? GAME_MODE_GAME_OVER : GAME_MODE_GET_READY);
-        }
-      }
+      miss = true;
+      missTime = 0.0f;
+      playSound(SOUND_MISS);
+      checkHighScore();
       break;
 
     case GAME_MODE_LEVEL_CLEARED:
-      if (levelClearedTime < maxLevelClearedTime) {
-        levelClearedTime += elapsedTime;
-
-        if (levelClearedTime >= maxLevelClearedTime) {
-          if (++level >= numberOfLevels) {
-            level = 0;
-          }
-
-          loadLevel();
-          changeGameMode(GAME_MODE_GET_READY);
-        }
-      }
+      levelClearedTime = 0.0f;
+      memset(bulletImage, NULL, sizeof(bulletImage));
+      memset(&isBulletCollide, false, sizeof(isBulletCollide));
+      memset(itemImage, NULL, sizeof(itemImage));
+      memset(&isItemCollide, false, sizeof(isItemCollide));
+      checkHighScore();
       break;
 
     case GAME_MODE_GAME_OVER:
-      if (gameOverTimeOut < maxGameOverTimeOut) {
-        gameOverTimeOut += elapsedTime;
-
-        if (gameOverTimeOut >= maxGameOverTimeOut) {
-          changeGameMode(GAME_MODE_TITLE);
-        }
-      }
+      gameOverTimeOut = 0.0f;
+      pressedButton = BUTTON_NONE;
+      addBallBlinkTime = 0.0f;
       break;
   }
 
-  if (gameMode == GAME_MODE_GET_READY || gameMode == GAME_MODE_PLAY || gameMode == GAME_MODE_MISS || gameMode == GAME_MODE_LEVEL_CLEARED) {
-    updatePaddle();
-
-    if (addBallBlinkTime > 0.0f) {
-      addBallBlinkTime -= elapsedTime;
-
-      if (addBallBlinkTime <= 0.0f) {
-        addBallBlinkTime = 0.0f;
-      }
-    }
-
-    if (gameMode == GAME_MODE_PLAY && brickCount == 0 && itemCount == 0) {
-      changeGameMode(GAME_MODE_LEVEL_CLEARED);
-    }
-  }
-
-  ESP.wdtFeed();
+  gameMode = mode;
 }
 
-void render() {
-  espert.oled.clear(false);
-  espert.oled.setColor(ESPERT_WHITE);
-
+void checkButtons() {
   switch (gameMode) {
     case GAME_MODE_TITLE:
     case GAME_MODE_TITLE_BLINK:
-      espert.oled.drawBitmap(0, 0, 128, 64, titleBitmap, false);
-
-      for (int i = 0; i < 4; i++) {
-        espert.oled.drawBitmap(56 + (i * 4), 43, 8, 8, highScoreDigitImage[i], false);
-      }
-
-      if (gameMode == GAME_MODE_TITLE || (gameMode == GAME_MODE_TITLE_BLINK && ((int)titleBlinkTime % 500 < 250))) {
-        espert.oled.drawBitmap(0, 0, 128, 32, breakoutBitmap, false);
-      }
       break;
 
     case GAME_MODE_GET_READY:
     case GAME_MODE_PLAY:
     case GAME_MODE_MISS:
     case GAME_MODE_LEVEL_CLEARED:
-    case GAME_MODE_GAME_OVER:
-      if (gameMode != GAME_MODE_LEVEL_CLEARED) {
-        for (int row = 0; row < rowCount; row++) {
-          for (int column = 0; column < numberOfColumns; column++) {
-            if (brickImage[row][column]) {
-              espert.oled.drawBitmap(brickPosition[row][column].x, brickPosition[row][column].y, 16, 8, brickImage[row][column], false);
+      if (isAutoPlay) {
+        if (gameMode == GAME_MODE_PLAY) {
+          if (autoPlayPaddlePosition == -1.0f || paddlePosition.x == autoPlayPaddlePosition) {
+            autoPlayPaddleLerpSpeed = 0.02f + ((random(0, 10) / 100.0f));
+            autoPlayPaddlePosition = ballPosition[mainBall][0];
+
+            int paddleHalfSize = paddleSize[(int)paddleType].x * 0.5f;
+            float leftPosition = screenRect[0] + paddleHalfSize;
+            if (autoPlayPaddlePosition < leftPosition) {
+              autoPlayPaddlePosition = leftPosition;
+            } else {
+              float rightPosition = screenRect[2] - paddleHalfSize + 1;
+              if (autoPlayPaddlePosition > rightPosition) {
+                autoPlayPaddlePosition = rightPosition;
+              }
             }
           }
+
+          paddlePosition.x = lerp(autoPlayPaddleLerpSpeed, paddlePosition.x, autoPlayPaddlePosition);
+          isUpdatePaddlePosition = true;
         }
-
-        for (int i = 0; i < numberOfBullets; i++) {
-          if (bulletImage[i]) {
-            espert.oled.drawBitmap(bulletPosition[i].x, bulletPosition[i].y, 8, 8, bulletImage[i], false);
-          }
-        }
-      }
-
-      for (int i = 0; i < numberOfItems; i++) {
-        if (itemImage[i]) {
-          espert.oled.drawBitmap(itemPosition[i].x, itemPosition[i].y, 8, 8, itemImage[i], false);
-        }
-      }
-
-      espert.oled.drawBitmap(paddlePosition.x - 16, paddlePosition.y, 32, 8, paddleBitmap[(int)paddleType], false);
-
-      if (((gameMode == GAME_MODE_GET_READY && isReadyToPlay && miss) || (gameMode == GAME_MODE_GET_READY && !miss) || gameMode == GAME_MODE_PLAY || gameMode == GAME_MODE_LEVEL_CLEARED) || (gameMode == GAME_MODE_MISS && ((int)missTime % 500) < 250)) {
-        for (int ball = 0; ball < numberOfBalls; ball++) {
-          if (ballDirection[ball][0] != 0 && ballDirection[ball][1] != 0) {
-            espert.oled.drawBitmap(ballPosition[ball][0], ballPosition[ball][1], 8, 8, ballBitmap, false);
-          }
-        }
-      }
-
-      // status bar
-      espert.oled.drawBitmap(0, 0, 128, 8, statusBarBackgroundBitmap, false);
-
-      if (gameMode == GAME_MODE_GET_READY) {
-        if (getReadyTime <= 1500.0f) {
-          espert.oled.drawBitmap(48, infoY, 32, 8, getReadyBitmap, false);
-        }
-        else if (getReadyTime >= 2000.0f && getReadyTime <= 2500.0f) {
-          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[3], false);
-        }
-        else if (getReadyTime >= 3000.0f && getReadyTime <= 3500.0f) {
-          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[2], false);
-        }
-        else if (getReadyTime >= 4000.0f && getReadyTime <= 4500.0f) {
-          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[1], false);
-        }
-        else if (getReadyTime >= 5000.0f) {
-          espert.oled.drawBitmap(60, infoY, 8, 8, goBitmap, false);
-        }
-      } else if (gameMode == GAME_MODE_GAME_OVER && ((int)gameOverTimeOut % 500) < 250) {
-        espert.oled.drawBitmap(48, infoY, 32, 8, gameOverBitmap, false);
-      } else if (gameMode == GAME_MODE_LEVEL_CLEARED && ((int)levelClearedTime % 500) < 250) {
-        espert.oled.drawBitmap(37, infoY, 64, 8, levelClearedBitmap, false);
-      }
-
-      espert.oled.drawBitmap(0, 0, 8, 64, wallBitmap, false);
-      espert.oled.drawBitmap(127, 0, 8, 64, wallBitmap, false);
-      espert.oled.setColor(ESPERT_BLACK);
-      espert.oled.drawBitmap(0, 0, 128, 8, isFPSVisibled ? statusBarBitmap[1] : statusBarBitmap[0], false);
-
-      if (((int)addBallBlinkTime % 200) < 100) {
-        espert.oled.drawBitmap(ballDigitPosition.x - (isFPSVisibled ? 14 : 0), ballDigitPosition.y, 8, 8, ballDigitImage, false);
-      }
-
-      for (int i = 0; i < 4; i++) {
-        espert.oled.drawBitmap(112 - (isFPSVisibled ? 26 : 0) + (i * 4), 1, 8, 8, scoreDigitImage[i], false);
-
-        if (i < 2) {
-          espert.oled.drawBitmap(levelDigitPosition[i].x, levelDigitPosition[i].y, 8, 8, levelDigitImage[i], false);
-
-          if (isFPSVisibled && isFPSDigitVisibled[i]) {
-            espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, 8, 8, fpsDigitImage[i], false);
-          }
+      } else {
+        if (pressedButton == BUTTON_LEFT) {
+          paddlePosition.x -= elapsedTime * paddleSpeed;
+          isUpdatePaddlePosition = true;
+        } else if (pressedButton == BUTTON_RIGHT) {
+          paddlePosition.x += elapsedTime * paddleSpeed;
+          isUpdatePaddlePosition = true;
         }
       }
       break;
-  }
 
-  espert.oled.update();
-  ESP.wdtFeed();
-}
-
-void setFPSImages(int value) {
-  if (isFPSVisibled) {
-    value = constrain(value, 0, 99);
-    String fpsString = intToString(value, 2, "0");
-
-    for (int i = 0; i < 2; i++) {
-      fpsDigitImage[i] = numberBitmap[fpsString.charAt(i) - '0'];
-      isFPSDigitVisibled[i] = isFPSVisibled;
-    }
-
-    if (value > 0 && value < 10) {
-      isFPSDigitVisibled[0] = false;
-    }
-  }
-}
-
-void pressButtons() {
-  for (int i = 0; i < 2; i++) {
-    bool isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
-
-    if (isPressed != isButtonPressed[i]) {
-      isButtonPressed[i] = isPressed;
-
-      if (isPressed) {
-        pressedButton = i + 1;
-      } else if (pressedButton == i + 1) {
-        pressedButton = 0;
-
-        if (gameMode == GAME_MODE_TITLE) {
-          changeGameMode(GAME_MODE_TITLE_BLINK);
-        } else if (gameMode == GAME_MODE_GAME_OVER) {
-          changeGameMode(GAME_MODE_TITLE);
-        }
-      }
-
+    case GAME_MODE_GAME_OVER:
       break;
-    }
   }
+}
+
+void checkHighScore() {
+  if (!isAutoPlay && score > highScore) {
+    highScore = score;
+    writeHighScore();
+  }
+}
+
+void deleteItem(int i) {
+  isItemCollide[i] = false;
+  itemImage[i] = NULL;
+
+  if (--itemCount < 0) {
+    itemCount = 0;
+  }
+}
+
+void initGame() {
+  resetGame();
+  changeGameMode(GAME_MODE_TITLE);
+  lastFrameTime = millis();
+  fpsLastFrameTime = lastFrameTime;
+
+  espert.buzzer.on(1);
+  espert.buzzer.on(0);
 }
 
 String intToString(int value, int length, String prefixChar) {
@@ -703,115 +622,140 @@ String intToString(int value, int length, String prefixChar) {
   return prefix + stringValue;
 }
 
-void readHighScores() {
-  int i = eepromAddress;
+bool isHitBrick(int x, int y, int width, int height, int directionX, int directionY, int ball) {
+  bool isCollide = false;
 
-  if (espert.eeprom.read(i, eepromKey.length()) == eepromKey) {
-    i += eepromKey.length();
-    String data = espert.eeprom.read(i, 4);
-    highScore = data.toInt();
+  for (int row = 0; row < numberOfRows && !isCollide; row++) {
+    for (int column = 0; column < numberOfColumns && !isCollide; column++) {
+      if (brickImage[row][column]) {
+        float w = (width + brickSize.x) * 0.5f;
+        float h = (height + brickSize.y) * 0.5f;
+        Point center = {x + (width * 0.5f), y + (height * 0.5f)};
+        Point centerBrick = {brickPosition[row][column].x + (brickSize.x * 0.5f), brickPosition[row][column].y + (brickSize.y * 0.5f)};
 
-    if (highScore < 0 || highScore > 9999) {
-      highScore = constrain(highScore, 0, 9999);
-      writeHighScores();
-    }
-  }
-}
+        float dx = center.x - centerBrick.x;
+        float dy = center.y - centerBrick.y;
 
-void writeHighScores() {
-  int i = eepromAddress;
-  espert.eeprom.write(i, eepromKey);
+        if (abs(dx) <= w && abs(dy) <= h) {
+          isCollide = true;
+          float wy = w * dy;
+          float hx = h * dx;
 
-  i += eepromKey.length();
-  espert.eeprom.write(i, intToString(highScore, 4, "0"));
-}
+          if (wy > hx) {
+            if (wy > -hx) { // hit top
+              isBallCollide[ball][1] = true;
+            } else { // hit left
+              isBallCollide[ball][0] = true;
+            }
+          } else {
+            if (wy > -hx) { // hit right
+              isBallCollide[ball][0] = true;
+            } else { // hit bottom
+              isBallCollide[ball][1] = true;
+            }
+          }
 
-void playSound(int index) {
-  if (isSoundEnabled) {
-    int frequency = 0;
+          playSound(SOUND_HIT_BLOCK);
 
-    switch (index) {
-      case SOUND_LAUNCH_BALL:
-      case SOUND_HIT_PADDLE:
-        frequency = 5;
-        buzzerDuration = 20.0f;
-        break;
+          if (--brickPower[row][column] == 0) {
+            brickImage[row][column] = NULL;
+            int brickType = (currentLevelTable[row][column] / 10) - 1;
+            addScore(brickScore[row]);
 
-      case SOUND_HIT_BORDER:
-        frequency = 10;
-        buzzerDuration = 20.0f;
-        break;
+            if (ball != -1 && ballHitRowFirstTimeFlag[ball][row] == 0) {
+              ballHitRowFirstTimeFlag[ball][row] = 1;
+            }
 
-      case SOUND_HIT_BLOCK:
-        frequency = 20;
-        buzzerDuration = 20.0f;
-        break;
+            if (--brickCount <= 0) {
+              brickCount = 0;
+            }
 
-      case SOUND_MISS:
-        frequency = 5;
-        buzzerDuration = 428.0f;
-        break;
-
-      default:
-        frequency = 0;
-        buzzerDuration = 0.0f;
-        break;
-    }
-
-    espert.buzzer.on(frequency);
-  }
-}
-
-void setScoreImages() {
-  String string = intToString(score, 4, "0");
-
-  for (int i = 0; i < 4; i++) {
-    scoreDigitImage[i] = numberBitmap[string.charAt(i) - '0'];
-  }
-}
-
-void setHighScoreImages() {
-  String string = intToString(highScore, 4, "0");
-
-  for (int i = 0; i < 4; i++) {
-    highScoreDigitImage[i] = numberBitmap[string.charAt(i) - '0'];
-  }
-}
-
-void setLevelImages() {
-  String string = intToString(level + 1, 2, "0");
-
-  for (int i = 0; i < 2; i++) {
-    levelDigitImage[i] = numberBitmap[string.charAt(i) - '0'];
-  }
-}
-
-void setBallImages() {
-  String string = intToString((ballLeft > 0) ? ballLeft : 0, 1, "0");
-  ballDigitImage = numberBitmap[string.charAt(0) - '0'];
-}
-
-void checkButtons() {
-  switch (gameMode) {
-    case GAME_MODE_TITLE:
-    case GAME_MODE_TITLE_BLINK:
-      break;
-
-    case GAME_MODE_GET_READY:
-    case GAME_MODE_PLAY:
-    case GAME_MODE_MISS:
-    case GAME_MODE_LEVEL_CLEARED:
-      if (pressedButton == 1) {
-        paddlePosition.x -= elapsedTime * paddleSpeed;
-        isUpdatePaddlePosition = true;
-      } else if (pressedButton == 2) {
-        paddlePosition.x += elapsedTime * paddleSpeed;
-        isUpdatePaddlePosition = true;
+            // spawn item
+            int typ = (currentLevelTable[row][column] % 10);
+            if (typ != ITEM_TYPE_NONE) {
+              for (int i = 0; i < numberOfItems; i++) {
+                if (itemImage[i] == NULL) {
+                  itemImage[i] = itemBitmap[typ - 1];
+                  itemType[i] = typ;
+                  itemPosition[i].x = brickPosition[row][column].x + ((brickSize.x - itemSize.x) * 0.5f);
+                  itemPosition[i].y = brickPosition[row][column].y + ((brickSize.y - itemSize.y) * 0.5f);
+                  itemCount++;
+                  break;
+                }
+              }
+            }
+          }
+        }
       }
-      break;
+    }
+  }
 
-    case GAME_MODE_GAME_OVER:
-      break;
+  return isCollide;
+}
+
+float lerp(float t, float v0, float v1) {
+  v0 = (1.0f - t) * v0 + t * v1;
+
+  if (fabs(v1 - v0) < 1.0f) {
+    v0 = v1;
+  }
+
+  return v0;
+}
+
+void loadLevel() {
+  numberOfBalls = 1;
+  brickCount = 0;
+  itemCount = 0;
+  setLevelImages();
+  rowCount = 0;
+  isUpdateRowCounter = false;
+  addBallBlinkTime = 0.0f;
+
+  memcpy(&currentLevelTable, levelTable[level], sizeof(currentLevelTable));
+  memset(&ballHitCount, 0, sizeof(ballHitCount));
+  memset(&isBallCollide, false, sizeof(isBallCollide));
+  memset(&itemType, ITEM_TYPE_NONE, sizeof(itemType));
+  memset(bulletImage, NULL, sizeof(bulletImage));
+  memset(&isBulletCollide, false, sizeof(isBulletCollide));
+  memset(itemImage, NULL, sizeof(itemImage));
+  memset(&isItemCollide, false, sizeof(isItemCollide));
+  memset(&rowFirstHitSpeed, 0.0f, sizeof(rowFirstHitSpeed));
+  memset(&ballHitRowFirstTimeFlag, 0, sizeof(ballHitRowFirstTimeFlag));
+
+  int count = 0;
+  int brickInRowCount[numberOfRows] = {0};
+
+  for (int row = 0; row < numberOfRows; row++) {
+    for (int column = 0; column < numberOfColumns; column++) {
+      brickImage[row][column] = NULL;
+
+      if (currentLevelTable[row][column] > 0) {
+        brickCount++;
+        brickInRowCount[row]++;
+        int brickType = (currentLevelTable[row][column] / 10) - 1;
+        int typ = (currentLevelTable[row][column] % 10);
+        brickImage[row][column] = brickBitmap[brickType + (typ == 0 ? 0 : numberOfBrickType)];
+        brickPosition[row][column].x = brickStartPosition.x + (column * (brickSize.x + brickGap.x));
+        brickPosition[row][column].y = brickStartPosition.y + (row * (brickSize.y + brickGap.y));
+        brickPower[row][column] = defaultBrickPower[brickType];
+      }
+    }
+
+    if (brickInRowCount[row] > 0) {
+      count++;
+    }
+  }
+
+  for (int row = 0; row < numberOfRows; row++) {
+    if (brickInRowCount[row] > 0) {
+      brickScore[row] = count--;
+      rowFirstHitSpeed[row] = count * 0.002f;
+    }
+  }
+
+  for (int ball = 0; ball < maxBall; ball++) {
+    ballSpeed[ball] = defaultBallSpeed;
   }
 }
 
@@ -908,9 +852,451 @@ void playLoop() {
       if (!isBallCollide[ball][0] && !isBallCollide[ball][1]) {
         ballPosition[ball][0] = newPosition.x;
         ballPosition[ball][1] = newPosition.y;
+      } else {
+        if (isAutoPlay && gameMode == GAME_MODE_PLAY) {
+          autoPlayPaddlePosition = -1.0f;
+        }
       }
     }
   }
+}
+
+void playSound(int index) {
+  if (!isAutoPlay && isSoundEnabled) {
+    int frequency = 0;
+
+    switch (index) {
+      case SOUND_LAUNCH_BALL:
+      case SOUND_HIT_PADDLE:
+        frequency = 5;
+        buzzerDuration = 20.0f;
+        break;
+
+      case SOUND_HIT_BORDER:
+        frequency = 10;
+        buzzerDuration = 20.0f;
+        break;
+
+      case SOUND_HIT_BLOCK:
+        frequency = 20;
+        buzzerDuration = 20.0f;
+        break;
+
+      case SOUND_MISS:
+        frequency = 5;
+        buzzerDuration = 428.0f;
+        break;
+
+      default:
+        frequency = 0;
+        buzzerDuration = 0.0f;
+        break;
+    }
+
+    espert.buzzer.on(frequency);
+  }
+}
+
+void pressButtons() {
+  for (int i = 0; i < numberOfButtons; i++) {
+    if (buttonPin[i] != -1) {
+      bool isPressed = false;
+
+      if (buttonPin[i] == A0) {
+        isPressed = (analogRead(buttonPin[i]) < 512) ? true : false;
+      } else {
+        isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
+      }
+
+      if (isPressed != isButtonPressed[i]) {
+        isButtonPressed[i] = isPressed;
+
+        if (isPressed) {
+          pressedButton = i;
+        } else if (pressedButton == i) {
+          if ((isGamepadEnabled && (pressedButton == BUTTON_A || pressedButton == BUTTON_B)) || (!isGamepadEnabled && (pressedButton == BUTTON_LEFT || pressedButton == BUTTON_RIGHT))) {
+            if (isAutoPlay) {
+              resetGame();
+              changeGameMode(GAME_MODE_TITLE_BLINK);
+            } else {
+              if (gameMode == GAME_MODE_TITLE) {
+                changeGameMode(GAME_MODE_TITLE_BLINK);
+              } else if (gameMode == GAME_MODE_GAME_OVER) {
+                changeGameMode(GAME_MODE_TITLE);
+              }
+            }
+          }
+
+          pressedButton = BUTTON_NONE;
+        }
+
+        break;
+      }
+    }
+  }
+}
+
+void readHighScore() {
+  int i = eepromAddress;
+
+  if (espert.eeprom.read(i, eepromKey.length()) == eepromKey) {
+    i += eepromKey.length();
+    String data = espert.eeprom.read(i, 4);
+    highScore = data.toInt();
+
+    if (highScore < 0 || highScore > 9999) {
+      highScore = constrain(highScore, 0, 9999);
+      writeHighScore();
+    }
+  }
+}
+
+void render() {
+  espert.oled.clear(false);
+  espert.oled.setColor(ESPERT_WHITE);
+
+  switch (gameMode) {
+    case GAME_MODE_TITLE:
+    case GAME_MODE_TITLE_BLINK:
+      espert.oled.drawBitmap(0, 0, 128, 64, titleBitmap, false);
+
+      for (int i = 0; i < 4; i++) {
+        espert.oled.drawBitmap(56 + (i * 4), 43, 8, 8, highScoreDigitImage[i], false);
+      }
+
+      if (gameMode == GAME_MODE_TITLE || (gameMode == GAME_MODE_TITLE_BLINK && ((int)titleBlinkTime % 500 < 250))) {
+        espert.oled.drawBitmap(0, 0, 128, 32, breakoutBitmap, false);
+      }
+      break;
+
+    case GAME_MODE_GET_READY:
+    case GAME_MODE_PLAY:
+    case GAME_MODE_MISS:
+    case GAME_MODE_LEVEL_CLEARED:
+    case GAME_MODE_GAME_OVER:
+      if (gameMode != GAME_MODE_LEVEL_CLEARED) {
+        for (int row = 0; row < rowCount; row++) {
+          for (int column = 0; column < numberOfColumns; column++) {
+            if (brickImage[row][column]) {
+              espert.oled.drawBitmap(brickPosition[row][column].x, brickPosition[row][column].y, 16, 8, brickImage[row][column], false);
+            }
+          }
+        }
+
+        for (int i = 0; i < numberOfBullets; i++) {
+          if (bulletImage[i]) {
+            espert.oled.drawBitmap(bulletPosition[i].x, bulletPosition[i].y, 8, 8, bulletImage[i], false);
+          }
+        }
+      }
+
+      for (int i = 0; i < numberOfItems; i++) {
+        if (itemImage[i]) {
+          espert.oled.drawBitmap(itemPosition[i].x, itemPosition[i].y, 8, 8, itemImage[i], false);
+        }
+      }
+
+      espert.oled.drawBitmap(paddlePosition.x - 16, paddlePosition.y, 32, 8, paddleBitmap[(int)paddleType], false);
+
+      if (((gameMode == GAME_MODE_GET_READY && isReadyToPlay && miss) || (gameMode == GAME_MODE_GET_READY && !miss) || gameMode == GAME_MODE_PLAY || gameMode == GAME_MODE_LEVEL_CLEARED) || (gameMode == GAME_MODE_MISS && ((int)missTime % 500) < 250)) {
+        for (int ball = 0; ball < numberOfBalls; ball++) {
+          if (ballDirection[ball][0] != 0 && ballDirection[ball][1] != 0) {
+            espert.oled.drawBitmap(ballPosition[ball][0], ballPosition[ball][1], 8, 8, ballBitmap, false);
+          }
+        }
+      }
+
+      // status bar
+      espert.oled.drawBitmap(0, 0, 128, 8, statusBarBackgroundBitmap, false);
+
+      if (gameMode == GAME_MODE_GET_READY) {
+        if (getReadyTime <= 1500.0f) {
+          espert.oled.drawBitmap(48, infoY, 32, 8, getReadyBitmap, false);
+        } else if (getReadyTime >= 2000.0f && getReadyTime <= 2500.0f) {
+          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[3], false);
+        } else if (getReadyTime >= 3000.0f && getReadyTime <= 3500.0f) {
+          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[2], false);
+        } else if (getReadyTime >= 4000.0f && getReadyTime <= 4500.0f) {
+          espert.oled.drawBitmap(62, infoY, 8, 8, numberBitmap[1], false);
+        } else if (getReadyTime >= 5000.0f) {
+          espert.oled.drawBitmap(60, infoY, 8, 8, goBitmap, false);
+        }
+      } else if (gameMode == GAME_MODE_GAME_OVER && ((int)gameOverTimeOut % 500) < 250) {
+        espert.oled.drawBitmap(48, infoY, 32, 8, gameOverBitmap, false);
+      } else if (gameMode == GAME_MODE_LEVEL_CLEARED && ((int)levelClearedTime % 500) < 250) {
+        espert.oled.drawBitmap(37, infoY, 64, 8, levelClearedBitmap, false);
+      }
+
+      espert.oled.drawBitmap(0, 0, 8, 64, wallBitmap, false);
+      espert.oled.drawBitmap(127, 0, 8, 64, wallBitmap, false);
+      espert.oled.setColor(ESPERT_BLACK);
+      espert.oled.drawBitmap(0, 0, 128, 8, isFPSVisibled ? statusBarBitmap[1] : statusBarBitmap[0], false);
+
+      if (((int)addBallBlinkTime % 200) < 100) {
+        espert.oled.drawBitmap(ballDigitPosition.x - (isFPSVisibled ? 14 : 0), ballDigitPosition.y, 8, 8, ballDigitImage, false);
+      }
+
+      for (int i = 0; i < 4; i++) {
+        espert.oled.drawBitmap(112 - (isFPSVisibled ? 26 : 0) + (i * 4), 1, 8, 8, scoreDigitImage[i], false);
+
+        if (i < 2) {
+          espert.oled.drawBitmap(levelDigitPosition[i].x, levelDigitPosition[i].y, 8, 8, levelDigitImage[i], false);
+
+          if (isFPSVisibled && isFPSDigitVisibled[i]) {
+            espert.oled.drawBitmap(fpsDigitPosition[i].x, fpsDigitPosition[i].y, 8, 8, fpsDigitImage[i], false);
+          }
+        }
+      }
+      break;
+  }
+
+  espert.oled.update();
+  ESP.wdtFeed();
+}
+
+void resetGame() {
+  isAutoPlay = false;
+  autoPlayPaddlePosition = -1.0f;
+  autoPlayPaddleLerpSpeed = 0.02f;
+  titleTime = 0.0f;
+  titleBlinkTime = 0.0f;
+  getReadyTime = 0.0f;
+  missTime = 0.0f;
+  levelClearedTime = 0.0f;
+  gameOverTimeOut = 0.0f;
+  paddleType = 0.0f;
+  paddleExpandTimeOut = 0.0f;
+  isPaddleExpand = false;
+  isUpdatePaddlePosition = false;
+  paddlePosition.x = 128.0f * 0.5f;
+  paddlePosition.y = (float)(screenRect[3] - paddleSize[(int)paddleType].y) + 1.0f;
+  ballLeft = newGameBallLeft;
+  setBallImages();
+  level = 0;
+  setLevelImages();
+  score = 0;
+  setScoreImages();
+  buttonDelay = 0.0f;
+  pressedButton = BUTTON_NONE;
+  isBulletEnabled = false;
+  miss = true;
+  bulletTimeOut = maxBulletTimeOut;
+
+  for (int ball = 0; ball < maxBall; ball++) {
+    ballSpeed[ball] = defaultBallSpeed;
+    ballPosition[ball][0] = paddlePosition.x - (ballSize.x * 0.5f);
+    ballPosition[ball][1] = paddlePosition.y - ballSize.y - 1;
+    ballDirection[ball][0] = (ball == mainBall) ? 1 : 0;
+    ballDirection[ball][1] = (ball == mainBall) ? -1 : 0;
+  }
+
+  memset(&isBallCollide, false, sizeof(isBallCollide));
+  memset(&ballHitCount, 0, sizeof(ballHitCount));
+  memset(&isButtonPressed, false, sizeof(isButtonPressed));
+  memset(bulletImage, NULL, sizeof(bulletImage));
+  memset(&bulletPosition, 0.0f, sizeof(bulletPosition));
+  memset(&isBulletCollide, false, sizeof(isBulletCollide));
+  memset(itemImage, NULL, sizeof(itemImage));
+  memset(&isItemCollide, false, sizeof(isItemCollide));
+
+  readHighScore();
+  setHighScoreImages();
+}
+
+void setBallImages() {
+  String string = intToString((ballLeft > 0) ? ballLeft : 0, 1, "0");
+  ballDigitImage = numberBitmap[string.charAt(0) - '0'];
+}
+
+void setFPSImages(int value) {
+  if (isFPSVisibled) {
+    value = constrain(value, 0, 99);
+    String fpsString = intToString(value, 2, "0");
+
+    for (int i = 0; i < 2; i++) {
+      fpsDigitImage[i] = numberBitmap[fpsString.charAt(i) - '0'];
+      isFPSDigitVisibled[i] = isFPSVisibled;
+    }
+
+    if (value > 0 && value < 10) {
+      isFPSDigitVisibled[0] = false;
+    }
+  }
+}
+
+void setHighScoreImages() {
+  String string = intToString(highScore, 4, "0");
+
+  for (int i = 0; i < 4; i++) {
+    highScoreDigitImage[i] = numberBitmap[string.charAt(i) - '0'];
+  }
+}
+
+void setLevelImages() {
+  String string = intToString(level + 1, 2, "0");
+
+  for (int i = 0; i < 2; i++) {
+    levelDigitImage[i] = numberBitmap[string.charAt(i) - '0'];
+  }
+}
+
+void setScoreImages() {
+  String string = intToString(score, 4, "0");
+
+  for (int i = 0; i < 4; i++) {
+    scoreDigitImage[i] = numberBitmap[string.charAt(i) - '0'];
+  }
+}
+
+void update() {
+  // game time
+  unsigned long frameTime = millis();
+  elapsedTime = frameTime - lastFrameTime;
+  lastFrameTime = frameTime;
+
+  // frame rate
+  frameCount++;
+  if (frameTime - fpsLastFrameTime >= 1000l) {
+    frameRate = frameCount;
+    frameCount = 0l;
+    fpsLastFrameTime = frameTime;
+    setFPSImages(frameRate);
+  }
+
+  // button
+  buttonDelay += elapsedTime;
+  if (buttonDelay >= maxButtonDelay) {
+    buttonDelay = 0.0f;
+    pressButtons();
+  }
+  checkButtons();
+
+  // sound
+  if (buzzerDuration > 0.0f) {
+    buzzerDuration -= elapsedTime;
+
+    if (buzzerDuration <= 0.0f) {
+      buzzerDuration = 0.0f;
+      espert.buzzer.off();
+    }
+  }
+
+  switch (gameMode) {
+    case GAME_MODE_TITLE:
+      titleTime += elapsedTime;
+
+      if (titleTime >= 5000.0f) {
+        isAutoPlay = true;
+        changeGameMode(GAME_MODE_TITLE_BLINK);
+        break;
+      }
+      break;
+
+    case GAME_MODE_TITLE_BLINK:
+      if (titleBlinkTime < maxTitleBlinkTime) {
+        titleBlinkTime += elapsedTime;
+
+        if (titleBlinkTime >= maxTitleBlinkTime) {
+          changeGameMode(GAME_MODE_GET_READY);
+        }
+      }
+      break;
+
+    case GAME_MODE_GET_READY:
+      if (getReadyTime < maxGetReadyTime) {
+        getReadyTime += elapsedTime;
+
+        if (rowCount < numberOfRows && getReadyTime <= 1500.0f) {
+          if ((int)getReadyTime % 300 < 150) {
+            if (!isUpdateRowCounter) {
+              isUpdateRowCounter = true;
+              rowCount++;
+            }
+          } else {
+            isUpdateRowCounter = false;
+          }
+        } else if (!isReadyToPlay && getReadyTime > 1500.0f) {
+          isReadyToPlay = true;
+
+          if (miss) {
+            if (ballLeft > 0) {
+              ballLeft--;
+            }
+
+            setBallImages();
+            miss = false;
+          }
+        } else if (getReadyTime >= maxGetReadyTime) {
+          changeGameMode(GAME_MODE_PLAY);
+        }
+      }
+      break;
+
+    case GAME_MODE_PLAY:
+      playLoop();
+      break;
+
+    case GAME_MODE_MISS:
+      if (missTime < maxMissTime) {
+        missTime += elapsedTime;
+
+        if (missTime >= maxMissTime) {
+          if (isAutoPlay) {
+            changeGameMode(GAME_MODE_TITLE);
+          } else {
+            changeGameMode((ballLeft == 0) ? GAME_MODE_GAME_OVER : GAME_MODE_GET_READY);
+          }
+        }
+      }
+      break;
+
+    case GAME_MODE_LEVEL_CLEARED:
+      if (levelClearedTime < maxLevelClearedTime) {
+        levelClearedTime += elapsedTime;
+
+        if (levelClearedTime >= maxLevelClearedTime) {
+          if (isAutoPlay) {
+            changeGameMode(GAME_MODE_TITLE);
+          } else {
+            if (++level >= numberOfLevels) {
+              level = 0;
+            }
+
+            loadLevel();
+            changeGameMode(GAME_MODE_GET_READY);
+          }
+        }
+      }
+      break;
+
+    case GAME_MODE_GAME_OVER:
+      if (gameOverTimeOut < maxGameOverTimeOut) {
+        gameOverTimeOut += elapsedTime;
+
+        if (gameOverTimeOut >= maxGameOverTimeOut) {
+          changeGameMode(GAME_MODE_TITLE);
+        }
+      }
+      break;
+  }
+
+  if (gameMode == GAME_MODE_GET_READY || gameMode == GAME_MODE_PLAY || gameMode == GAME_MODE_MISS || gameMode == GAME_MODE_LEVEL_CLEARED) {
+    updatePaddle();
+
+    if (addBallBlinkTime > 0.0f) {
+      addBallBlinkTime -= elapsedTime;
+
+      if (addBallBlinkTime <= 0.0f) {
+        addBallBlinkTime = 0.0f;
+      }
+    }
+
+    if (gameMode == GAME_MODE_PLAY && brickCount == 0 && itemCount == 0) {
+      changeGameMode(GAME_MODE_LEVEL_CLEARED);
+    }
+  }
+
+  ESP.wdtFeed();
 }
 
 void updatePaddle() {
@@ -1081,265 +1467,10 @@ void updatePaddle() {
   }
 }
 
-bool isHitBrick(int x, int y, int width, int height, int directionX, int directionY, int ball) {
-  bool isCollide = false;
+void writeHighScore() {
+  int i = eepromAddress;
+  espert.eeprom.write(i, eepromKey);
 
-  for (int row = 0; row < numberOfRows && !isCollide; row++) {
-    for (int column = 0; column < numberOfColumns && !isCollide; column++) {
-      if (brickImage[row][column]) {
-        float w = (width + brickSize.x) * 0.5f;
-        float h = (height + brickSize.y) * 0.5f;
-        Point center = {x + (width * 0.5f), y + (height * 0.5f)};
-        Point centerBrick = {brickPosition[row][column].x + (brickSize.x * 0.5f), brickPosition[row][column].y + (brickSize.y * 0.5f)};
-
-        float dx = center.x - centerBrick.x;
-        float dy = center.y - centerBrick.y;
-
-        if (abs(dx) <= w && abs(dy) <= h) {
-          isCollide = true;
-          float wy = w * dy;
-          float hx = h * dx;
-
-          if (wy > hx) {
-            if (wy > -hx) { // hit top
-              isBallCollide[ball][1] = true;
-            } else { // hit left
-              isBallCollide[ball][0] = true;
-            }
-          } else {
-            if (wy > -hx) { // hit right
-              isBallCollide[ball][0] = true;
-            } else { // hit bottom
-              isBallCollide[ball][1] = true;
-            }
-          }
-
-          playSound(SOUND_HIT_BLOCK);
-
-          if (--brickPower[row][column] == 0) {
-            brickImage[row][column] = NULL;
-            int brickType = (currentLevelTable[row][column] / 10) - 1;
-            addScore(brickScore[row]);
-
-            if (ball != -1 && ballHitRowFirstTimeFlag[ball][row] == 0) {
-              ballHitRowFirstTimeFlag[ball][row] = 1;
-            }
-
-            if (--brickCount <= 0) {
-              brickCount = 0;
-            }
-
-            // spawn item
-            int typ = (currentLevelTable[row][column] % 10);
-            if (typ != ITEM_TYPE_NONE) {
-              for (int i = 0; i < numberOfItems; i++) {
-                if (itemImage[i] == NULL) {
-                  itemImage[i] = itemBitmap[typ - 1];
-                  itemType[i] = typ;
-                  itemPosition[i].x = brickPosition[row][column].x + ((brickSize.x - itemSize.x) * 0.5f);
-                  itemPosition[i].y = brickPosition[row][column].y + ((brickSize.y - itemSize.y) * 0.5f);
-                  itemCount++;
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return isCollide;
-}
-
-void changeGameMode(int mode) {
-  switch (mode) {
-    case GAME_MODE_TITLE:
-      resetGame();
-      setHighScoreImages();
-      break;
-
-    case GAME_MODE_TITLE_BLINK:
-      titleBlinkTime = 0.0f;
-      break;
-
-    case GAME_MODE_GET_READY:
-      if (gameMode == GAME_MODE_TITLE_BLINK) {
-        loadLevel();
-      }
-
-      isReadyToPlay = false;
-      setScoreImages();
-      setBallImages();
-      getReadyTime = 0.0f;
-      missTime = 0.0f;
-      ballPosition[mainBall][0] = paddlePosition.x - (ballSize.x * 0.5f);
-      ballPosition[mainBall][1] = paddlePosition.y - ballSize.y - 1;
-      ballDirection[mainBall][0] = 1;
-      ballDirection[mainBall][1] = -1;
-      memset(&isBallCollide, false, sizeof(isBallCollide));
-      break;
-
-    case GAME_MODE_PLAY:
-      playSound(SOUND_LAUNCH_BALL);
-      getReadyTime = maxGetReadyTime;
-      break;
-
-    case GAME_MODE_MISS:
-      miss = true;
-      missTime = 0.0f;
-      playSound(SOUND_MISS);
-      checkHighScore();
-      break;
-
-    case GAME_MODE_LEVEL_CLEARED:
-      levelClearedTime = 0.0f;
-      memset(bulletImage, NULL, sizeof(bulletImage));
-      memset(&isBulletCollide, false, sizeof(isBulletCollide));
-      memset(itemImage, NULL, sizeof(itemImage));
-      memset(&isItemCollide, false, sizeof(isItemCollide));
-      checkHighScore();
-      break;
-
-    case GAME_MODE_GAME_OVER:
-      gameOverTimeOut = 0.0f;
-      pressedButton = 0;
-      addBallBlinkTime = 0.0f;
-      break;
-  }
-
-  gameMode = mode;
-}
-
-void checkHighScore() {
-  if (score > highScore) {
-    highScore = score;
-    writeHighScores();
-  }
-}
-
-void addScore(int value) {
-  score = constrain(score + value, 0, 9999);
-  setScoreImages();
-}
-
-void addBall(int value) {
-  ballLeft = constrain(ballLeft + value, 0, 9);
-  setBallImages();
-}
-
-void deleteItem(int i) {
-  isItemCollide[i] = false;
-  itemImage[i] = NULL;
-
-  if (--itemCount < 0) {
-    itemCount = 0;
-  }
-}
-
-void initGame() {
-  readHighScores();
-  resetGame();
-  changeGameMode(GAME_MODE_TITLE);
-  lastFrameTime = millis();
-  fpsLastFrameTime = lastFrameTime;
-}
-
-void resetGame() {
-  titleBlinkTime = 0.0f;
-  getReadyTime = 0.0f;
-  missTime = 0.0f;
-  levelClearedTime = 0.0f;
-  gameOverTimeOut = 0.0f;
-  paddleType = 0.0f;
-  paddleExpandTimeOut = 0.0f;
-  isPaddleExpand = false;
-  isUpdatePaddlePosition = false;
-  paddlePosition.x = 128.0f * 0.5f;
-  paddlePosition.y = (float)(screenRect[3] - paddleSize[(int)paddleType].y) + 1.0f;
-  ballLeft = newGameBallLeft;
-  setBallImages();
-  level = 0;
-  setLevelImages();
-  score = 0;
-  setScoreImages();
-  setHighScoreImages();
-  buttonDelay = 0.0f;
-  pressedButton = 0;
-  isBulletEnabled = false;
-  miss = true;
-  bulletTimeOut = maxBulletTimeOut;
-
-  for (int ball = 0; ball < maxBall; ball++) {
-    ballSpeed[ball] = defaultBallSpeed;
-    ballPosition[ball][0] = paddlePosition.x - (ballSize.x * 0.5f);
-    ballPosition[ball][1] = paddlePosition.y - ballSize.y - 1;
-    ballDirection[ball][0] = (ball == mainBall) ? 1 : 0;
-    ballDirection[ball][1] = (ball == mainBall) ? -1 : 0;
-  }
-
-  memset(&isBallCollide, false, sizeof(isBallCollide));
-  memset(&ballHitCount, 0, sizeof(ballHitCount));
-  memset(&isButtonPressed, false, sizeof(isButtonPressed));
-  memset(bulletImage, NULL, sizeof(bulletImage));
-  memset(&bulletPosition, 0.0f, sizeof(bulletPosition));
-  memset(&isBulletCollide, false, sizeof(isBulletCollide));
-  memset(itemImage, NULL, sizeof(itemImage));
-  memset(&isItemCollide, false, sizeof(isItemCollide));
-}
-
-void loadLevel() {
-  numberOfBalls = 1;
-  brickCount = 0;
-  itemCount = 0;
-  setLevelImages();
-  rowCount = 0;
-  isUpdateRowCounter = false;
-  addBallBlinkTime = 0.0f;
-
-  memcpy(&currentLevelTable, levelTable[level], sizeof(currentLevelTable));
-  memset(&ballHitCount, 0, sizeof(ballHitCount));
-  memset(&isBallCollide, false, sizeof(isBallCollide));
-  memset(&itemType, ITEM_TYPE_NONE, sizeof(itemType));
-  memset(bulletImage, NULL, sizeof(bulletImage));
-  memset(&isBulletCollide, false, sizeof(isBulletCollide));
-  memset(itemImage, NULL, sizeof(itemImage));
-  memset(&isItemCollide, false, sizeof(isItemCollide));
-  memset(&rowFirstHitSpeed, 0.0f, sizeof(rowFirstHitSpeed));
-  memset(&ballHitRowFirstTimeFlag, 0, sizeof(ballHitRowFirstTimeFlag));
-
-  int count = 0;
-  int brickInRowCount[numberOfRows] = {0};
-
-  for (int row = 0; row < numberOfRows; row++) {
-    for (int column = 0; column < numberOfColumns; column++) {
-      brickImage[row][column] = NULL;
-
-      if (currentLevelTable[row][column] > 0) {
-        brickCount++;
-        brickInRowCount[row]++;
-        int brickType = (currentLevelTable[row][column] / 10) - 1;
-        int typ = (currentLevelTable[row][column] % 10);
-        brickImage[row][column] = brickBitmap[brickType + (typ == 0 ? 0 : numberOfBrickType)];
-        brickPosition[row][column].x = brickStartPosition.x + (column * (brickSize.x + brickGap.x));
-        brickPosition[row][column].y = brickStartPosition.y + (row * (brickSize.y + brickGap.y));
-        brickPower[row][column] = defaultBrickPower[brickType];
-      }
-    }
-
-    if (brickInRowCount[row] > 0) {
-      count++;
-    }
-  }
-
-  for (int row = 0; row < numberOfRows; row++) {
-    if (brickInRowCount[row] > 0) {
-      brickScore[row] = count--;
-      rowFirstHitSpeed[row] = count * 0.002f;
-    }
-  }
-
-  for (int ball = 0; ball < maxBall; ball++) {
-    ballSpeed[ball] = defaultBallSpeed;
-  }
+  i += eepromKey.length();
+  espert.eeprom.write(i, intToString(highScore, 4, "0"));
 }
