@@ -1,5 +1,34 @@
 #include "ESPert.h"
 
+const float ESPERT_LIBRARY_VERSION = 0.10f;
+
+int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2; // default
+
+int ESPERT_PIN_LED = 16;
+int ESPERT_PIN_BUTTON = 2;
+int ESPERT_PIN_SDA = 4;
+int ESPERT_PIN_SCL = 5;
+int ESPERT_PIN_DHT = 12;
+int ESPERT_DHT_TYPE = DHT22;
+
+const long ESPertFlashID[] = {0x1640EF, 0x1340C8, 0x1340EF}; // Little Endian
+const String ESPertFlashDesc[] = {"WINBOND W25Q32: 32M-bit / 4M-byte", "GIGADEVICE GD25Q40 4M-bit / 512K-byte", "WINBOND W25Q40 4M-bit / 512K-byte"};
+
+ESP8266WebServer* ESPertServer = NULL;
+MDNSResponder ESPertMDNS;
+
+String ESPertNetworks[32] = {""};
+int ESPertNumberOfNetworks = 0;
+String ESPertSSID = "";
+String ESPertPassword = "";
+String ESPertContentHeader = "";
+String ESPertContentFooter = "";
+String ESPertSSIDHeader = "";
+String ESPertSSIDFooter = "";
+String ESPertContent = "";
+
+String ESPertReadString; // rx tx buffer
+
 static ESPert* _espert = NULL;
 
 ESPert::ESPert() {

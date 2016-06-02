@@ -22,7 +22,7 @@
 #include <ArduinoOTA.h>
 #include "logo.h"
 
-static const float ESPERT_LIBRARY_VERSION = 0.10f;
+extern const float ESPERT_LIBRARY_VERSION;
 
 #define ESPERT_BOARD_GENERIC        0
 
@@ -32,7 +32,7 @@ static const float ESPERT_LIBRARY_VERSION = 0.10f;
 #define ESPERT_BOARD_ESPRESSO_LITE2 2
 #define ESPERT_BOARD_ESP201         3
 
-static int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2; // default
+extern int ESPertBoardType; // default
 
 #ifdef ESPERT_DEBUG
 
@@ -84,31 +84,30 @@ static int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2; // default
 #define ColorYellow 0xFFFF00
 #define ColorWhite  0xFFFFFF
 
-static int ESPERT_PIN_LED    = 16;
-static int ESPERT_PIN_BUTTON = 2;
-static int ESPERT_PIN_SDA    = 4;
-static int ESPERT_PIN_SCL    = 5;
-static int ESPERT_PIN_DHT    = 12;
+extern int ESPERT_PIN_LED;
+extern int ESPERT_PIN_BUTTON;
+extern int ESPERT_PIN_SDA;
+extern int ESPERT_PIN_SCL;
+extern int ESPERT_PIN_DHT;
+extern int ESPERT_DHT_TYPE;
 
-static int ESPERT_DHT_TYPE   = DHT22;
+extern const long ESPertFlashID[]; // Little Endian
+extern const String ESPertFlashDesc[];
 
-static const long ESPertFlashID[] = {0x1640EF, 0x1340C8, 0x1340EF}; // Little Endian
-static const String ESPertFlashDesc[] = {"WINBOND W25Q32: 32M-bit / 4M-byte", "GIGADEVICE GD25Q40 4M-bit / 512K-byte", "WINBOND W25Q40 4M-bit / 512K-byte"};
+extern ESP8266WebServer* ESPertServer;
+extern MDNSResponder ESPertMDNS;
 
-static ESP8266WebServer* ESPertServer = NULL;
-static MDNSResponder ESPertMDNS;
+extern String ESPertNetworks[32];
+extern int ESPertNumberOfNetworks;
+extern String ESPertSSID;
+extern String ESPertPassword;
+extern String ESPertContentHeader;
+extern String ESPertContentFooter;
+extern String ESPertSSIDHeader;
+extern String ESPertSSIDFooter;
+extern String ESPertContent;
 
-static String ESPertNetworks[32] = {""};
-static int ESPertNumberOfNetworks = 0;
-static String ESPertSSID = "";
-static String ESPertPassword = "";
-static String ESPertContentHeader = "";
-static String ESPertContentFooter = "";
-static String ESPertSSIDHeader = "";
-static String ESPertSSIDFooter = "";
-static String ESPertContent = "";
-
-static String ESPertReadString; // rx tx buffer
+extern String ESPertReadString; // rx tx buffer
 
 typedef enum {
   eIdle,
