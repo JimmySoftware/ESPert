@@ -37,3 +37,4 @@ extras/tmp.clang_complete
 extras/tmp/*/**
 
 .clang_complete
+.DS_Store
