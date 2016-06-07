@@ -8,7 +8,7 @@ Game* game = NULL;
 void setup() {
   espert.init();
   game = new menu::Menu();
-  game->init(&espert);
+  game->init(&espert, false, true);
 }
 
 void loop() {

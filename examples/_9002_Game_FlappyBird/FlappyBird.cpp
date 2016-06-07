@@ -68,13 +68,6 @@ FlappyBird::FlappyBird() {
   pipeRandomFirstTime = 3000.0f; // milliseconds
   pipeRandomNextTime = 2000.0f; // milliseconds
   pipeRandomTime = 0.0f;
-
-  // read data
-  gameIndex = GAME_FLAPPY_BIRD;
-  readHighScore();
-  readVolume();
-  resetGame();
-  changeGameMode(GAME_MODE_TITLE);
 }
 
 void FlappyBird::addScore(int value) {
@@ -124,6 +117,7 @@ void FlappyBird::changeGameMode(int mode) {
 
 void FlappyBird::checkHighScore() {
   isNewHighScore = false;
+  scorePanelMedalImage = NULL;
 
   if (score >= 40) {
     scorePanelMedalImage = medalBitmap[MEDAL_PLATINUM];
@@ -143,6 +137,14 @@ void FlappyBird::checkHighScore() {
       writeHighScore();
     }
   }
+}
+
+void FlappyBird::initGame() {
+  gameIndex = GAME_FLAPPY_BIRD;
+  readHighScore();
+  readVolume();
+  resetGame();
+  changeGameMode(GAME_MODE_TITLE);
 }
 
 bool FlappyBird::isBackToMenuEnabled() {
@@ -243,14 +245,8 @@ void FlappyBird::pressButton() {
             pressedButton = i;
 
             if (gameMode == GAME_MODE_TITLE && !isGamepadEnabled && i == BUTTON_RIGHT) {
-              if (volume == 0.0f) {
-                volume = 1.0f;
-              } else {
-                volume = 0.0f;
-              }
-
+              toggleVolume();
               titleTime = 0.0f;
-              isVolumeChanged = true;
             } else if (!isAutoPlay && (gameMode == GAME_MODE_GET_READY || gameMode == GAME_MODE_PLAY)) {
               jump();
 
@@ -259,11 +255,9 @@ void FlappyBird::pressButton() {
               }
             }
           } else {
-            if (isVolumeChanged) {
+            if (isVolumeChanged > 0.0f) {
               if ((!isGamepadEnabled && i == BUTTON_RIGHT) || (isGamepadEnabled && (i == BUTTON_UP || i == BUTTON_DOWN))) {
                 titleTime = 0.0f;
-                isVolumeChanged = false;
-                writeVolume();
                 playSound(SOUND_VOLUME);
               }
             } else if (i == pressedButton && ((isGamepadEnabled && (i == BUTTON_A || i == BUTTON_B)) || (!isGamepadEnabled && (i == BUTTON_LEFT || i == BUTTON_RIGHT)))) {
@@ -460,17 +454,16 @@ void FlappyBird::update() {
         velocity = initialVelocity * 0.7f;
       }
 
-      titleTime += (isVolumeChanged ? 0.0f : elapsedTime);
+      titleTime += ((isVolumeChanged > 0.0f) ? 0.0f : elapsedTime);
 
       if (isGamepadEnabled && (pressedButton == BUTTON_UP || pressedButton == BUTTON_DOWN)) {
         if (pressedButton == BUTTON_UP) {
-          volume = constrain(volume + 0.05f, 0.0f, 1.0f);
+          increaseVolume();
         } else if (pressedButton == BUTTON_DOWN) {
-          volume = constrain(volume - 0.05f, 0.0f, 1.0f);
+          decreaseVolume();
         }
 
         titleTime = 0.0f;
-        isVolumeChanged = true;
       }
 
       if (titleTime >= 5000.0f) {
@@ -590,8 +583,7 @@ void FlappyBird::update() {
             if (scorePanelScore < score) {
               scorePanelScore += speed;
 
-              if (scorePanelScore > score)
-              {
+              if (scorePanelScore > score) {
                 scorePanelScore = score;
               }
             } else if (scorePanelScore > score) {

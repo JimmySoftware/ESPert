@@ -71,13 +71,6 @@ Breakout::Breakout() {
   memset(&itemPosition, 0.0f, sizeof(itemPosition));
   memset(&isItemCollide, false, sizeof(isItemCollide));
   addBallBlinkTime = 0.0f;
-
-  // read data
-  gameIndex = GAME_BREAKOUT;
-  readHighScore();
-  readVolume();
-  resetGame();
-  changeGameMode(GAME_MODE_TITLE);
 }
 
 void Breakout::addBall(int value) {
@@ -214,6 +207,14 @@ void Breakout::deleteItem(int i) {
   if (--itemCount < 0) {
     itemCount = 0;
   }
+}
+
+void Breakout::initGame() {
+  gameIndex = GAME_BREAKOUT;
+  readHighScore();
+  readVolume();
+  resetGame();
+  changeGameMode(GAME_MODE_TITLE);
 }
 
 bool Breakout::isBackToMenuEnabled() {
@@ -364,26 +365,27 @@ void Breakout::playLoop() {
       Point newPosition = {ballPosition[ball][0] + (ballDirection[ball][0] * speed), ballPosition[ball][1] + (ballDirection[ball][1] * speed)};
 
       // collision
-      while ((int)ballPosition[ball][0] != (int)newPosition.x && (int)ballPosition[ball][1] != (int)newPosition.y && !isBallCollide[ball][0] && !isBallCollide[ball][1]) {
+      bool isFinished = false;
+      while (!isFinished) {
         ballPosition[ball][0] += ballDirection[ball][0];
         ballPosition[ball][1] += ballDirection[ball][1];
 
         // paddle
-        if ((int)ballPosition[ball][1] >= paddlePosition.y - 1 && (int)ballPosition[ball][1] <= paddlePosition.y + 1) {
+        if (ballPosition[ball][1] >= paddlePosition.y - 1 && ballPosition[ball][1] <= paddlePosition.y + 1) {
           int paddleWidth = paddleSize[(int)paddleType].width;
           int paddleX = paddlePosition.x - (paddleWidth * 0.5f);
 
-          if ((int)ballPosition[ball][0] + ballSize.width - 1 >= paddleX && (int)ballPosition[ball][0] < paddleX + paddleWidth) {
+          if (ballPosition[ball][0] + ballSize.width - 1 >= paddleX && ballPosition[ball][0] < paddleX + paddleWidth) {
             isBallCollide[ball][1] = true;
             ballPosition[ball][1] = paddlePosition.y - 1.0f;
             playSound(SOUND_HIT_PADDLE);
 
-            if ((int)ballPosition[ball][0] + ballSize.width - 1 <= paddleX + 4) { // left corner
-              if (ballDirection[ball][0] == 1) {
+            if (ballPosition[ball][0] + ballSize.width - 1 <= paddleX + 4) { // left corner
+              if (ballDirection[ball][0] > 0) {
                 isBallCollide[ball][0] = true;
               }
-            } else if ((int)ballPosition[ball][0] >= paddleX + paddleWidth - 4) { // right corner
-              if (ballDirection[ball][0] == -1) {
+            } else if (ballPosition[ball][0] >= paddleX + paddleWidth - 4) { // right corner
+              if (ballDirection[ball][0] < 0) {
                 isBallCollide[ball][0] = true;
               }
             }
@@ -392,14 +394,14 @@ void Breakout::playLoop() {
 
         // border
         for (int i = 0; i < 2 && !isBallCollide[ball][0] && !isBallCollide[ball][1]; i++) {
-          if ((int)ballPosition[ball][i] < screenRect[i]) { // left and top
+          if (ballPosition[ball][i] < screenRect[i]) { // left and top
             ballPosition[ball][i] = screenRect[i];
             isBallCollide[ball][i] = true;
             playSound(SOUND_HIT_BORDER);
           } else { // right and bottom
             float pos = screenRect[2 + i] - (i == 0 ? ballSize.width : ballSize.height) + 1;
 
-            if ((int)ballPosition[ball][i] > pos) {
+            if (ballPosition[ball][i] > pos) {
               ballPosition[ball][i] = pos;
               isBallCollide[ball][i] = true;
 
@@ -438,6 +440,14 @@ void Breakout::playLoop() {
             }
           }
         }
+
+        if (isBallCollide[ball][0] || isBallCollide[ball][1]) {
+          isFinished = true;
+        } else if ((ballDirection[ball][0] > 0 && ballPosition[ball][0] > newPosition.x) || (ballDirection[ball][0] < 0 && ballPosition[ball][0] < newPosition.x)) {
+          isFinished = true;
+        } else if ((ballDirection[ball][1] > 0 && ballPosition[ball][1] > newPosition.y) || (ballDirection[ball][1] < 0 && ballPosition[ball][1] < newPosition.y)) {
+          isFinished = true;
+        }
       }
 
       if (!isBallCollide[ball][0] && !isBallCollide[ball][1]) {
@@ -453,8 +463,7 @@ void Breakout::playLoop() {
 }
 
 void Breakout::playSound(int index) {
-  if (!isAutoPlay && isSoundEnabled && isSoundInterruptEnabled) {
-    isSoundInterruptEnabled = false;
+  if (!isAutoPlay && isSoundEnabled) {
     int frequency = 0;
 
     switch (index) {
@@ -512,22 +521,14 @@ void Breakout::pressButton() {
           pressedButton = i;
 
           if (gameMode == GAME_MODE_TITLE && isSoundEnabled && !isGamepadEnabled && pressedButton == BUTTON_RIGHT) {
-            if (volume == 0.0f) {
-              volume = 1.0f;
-            } else {
-              volume = 0.0f;
-            }
-
+            toggleVolume();
             titleTime = 0.0f;
-            isVolumeChanged = true;
           }
         } else {
-          if (isVolumeChanged && isSoundEnabled) {
+          if (isVolumeChanged > 0.0f && isSoundEnabled) {
             if ((!isGamepadEnabled && i == BUTTON_RIGHT) || (isGamepadEnabled && (i == BUTTON_UP || i == BUTTON_DOWN))) {
-              titleTime = 0.0f;
-              isVolumeChanged = false;
-              writeVolume();
               playSound(SOUND_VOLUME);
+              titleTime = 0.0f;
             }
           } else if (isMenuEnabled && isGamepadEnabled && gameMode == GAME_MODE_TITLE && pressedButton == BUTTON_LEFT && i == BUTTON_LEFT) {
             isRequestingExit = true;
@@ -746,17 +747,16 @@ void Breakout::update() {
 
   switch (gameMode) {
     case GAME_MODE_TITLE:
-      titleTime += (isVolumeChanged ? 0.0f : elapsedTime);
+      titleTime += ((isVolumeChanged > 0.0f) ? 0.0f : elapsedTime);
 
       if (isSoundEnabled && (isGamepadEnabled && (pressedButton == BUTTON_UP || pressedButton == BUTTON_DOWN))) {
         if (pressedButton == BUTTON_UP) {
-          volume = constrain(volume + 0.05f, 0.0f, 1.0f);
+          increaseVolume();
         } else if (pressedButton == BUTTON_DOWN) {
-          volume = constrain(volume - 0.05f, 0.0f, 1.0f);
+          decreaseVolume();
         }
 
         titleTime = 0.0f;
-        isVolumeChanged = true;
       }
 
       if (titleTime >= 5000.0f) {

@@ -5,39 +5,26 @@
 using namespace octopus;
 
 Octopus::Octopus() {
-  isTimeVisibled = true;
-  hours = 0;
-  minutes = 0;
-  seconds = 0;
-
   memset(diverStepImage, NULL, sizeof(diverStepImage));
   memset(&isDiverStepVisibled, false, sizeof(isDiverStepVisibled));
-
   memset(&isRemainderVisibled, true, sizeof(isRemainderVisibled));
-
   memset(hourDigitImage, NULL, sizeof(hourDigitImage));
   memset(&isHourDigitVisibled, false, sizeof(isHourDigitVisibled));
-
   memset(minuteDigitImage, NULL, sizeof(minuteDigitImage));
   memset(&isMinuteDigitVisibled, false, sizeof(isMinuteDigitVisibled));
 
   isMissDiverVisibled = false;
-
   missArmImage = NULL;
   isMissArmVisibled = false;
-
   missLegsImage = NULL;
   isMissLegsVisibled = false;
 
   gameTypeImage = NULL;
   isGameTypeVisibled = false;
 
-  timeSyncLastFrameTime = 0l;
-
   gameAHighScore = 0;
   gameBHighScore = 0;
   gameSpeed = 50;
-  isSecondChanged = false;
   gameLoopTime = 0l;
   gameType = GAME_NONE;
   isBagVisibled = false;
@@ -66,8 +53,6 @@ Octopus::Octopus() {
   tentacle = 0;
   diverPositionIndex = 0;
   isNextTentacle = false;
-
-  initGame();
 }
 
 void Octopus::addScore() {
@@ -119,8 +104,7 @@ void Octopus::autoMove() {
 }
 
 void Octopus::autoPlayScreen() {
-  if (isSecondChanged) {
-    isSecondChanged = false;
+  if (isSecondChanged()) {
     showTime();
 
     if (caught > 0) {
@@ -147,7 +131,7 @@ void Octopus::pressButton() {
           isButtonPressed[i] = isPressed;
 
           if (isPressed) {
-            if (pressedButton == BUTTON_NONE && (addBonusScore == 0 || !isPlaying) && !isVolumeChanged) {
+            if (pressedButton == BUTTON_NONE && (addBonusScore == 0 || !isPlaying)) {
               pressedButton = i;
 
               if (syncInternetTimeStep == SYNC_FINISHED) {
@@ -171,25 +155,17 @@ void Octopus::pressButton() {
               }
 
               if (!isGamepadEnabled && (i == BUTTON_LEFT || i == BUTTON_RIGHT)) {
-                if (volume == 0.0f) {
-                  volume = 1.0f;
-                } else {
-                  volume = 0.0f;
-                }
-
-                isVolumeChanged = true;
+                toggleVolume();
               }
             }
           } else {
             if (isMenuEnabled && isGamepadEnabled && !isPlaying && !isGameTypeVisibled && pressedButton == BUTTON_LEFT && i == BUTTON_LEFT) {
               isRequestingExit = true;
-            } else if (isSoundEnabled && isVolumeChanged) {
+            } else if (isSoundEnabled && isVolumeChanged > 0.0f) {
               showHighScoreTime = 0;
               isGameTypeVisibled = false;
 
               if ((!isGamepadEnabled && (i == BUTTON_LEFT || i == BUTTON_RIGHT)) || (isGamepadEnabled && (i == BUTTON_UP || i == BUTTON_DOWN))) {
-                isVolumeChanged = false;
-                writeVolume();
                 playSound(4);
               }
             } else if (syncInternetTimeStep == SYNC_FINISHED && showHighScoreTime > 0) {
@@ -550,9 +526,15 @@ void Octopus::initGame() {
   gameAHighScore = readHighScore();
   gameBHighScore = readHighScore(String(maxScore[gameIndex]).length());
   readVolume();
-  showResetScreen();
-  syncInternetTimeStep = (isTimeVisibled && wifiSSID && strlen(wifiSSID) > 0) ? SYNC_SHOW_RESET_SCREEN : SYNC_DELAY;
-  showResetScreenTime = 2000.0f;
+
+  if (isMenuEnabled) {
+    syncInternetTimeStep = SYNC_FINISHED;
+    showResetScreenTime = 0.0f;
+  } else {
+    showResetScreen();
+    showResetScreenTime = 3000.0f;
+    syncInternetTimeStep = SYNC_SHOW_RESET_SCREEN;
+  }
 }
 
 String intToString(int value, int length, String prefixChar) {
@@ -628,8 +610,7 @@ void Octopus::moveRight() {
 }
 
 void Octopus::playSound(int index) {
-  if (isSoundEnabled && (isPlaying || index == 4) && isSoundInterruptEnabled) {
-    isSoundInterruptEnabled = false;
+  if (isSoundEnabled && (isPlaying || index == 4)) {
     int frequency = 25;
 
     switch (index) {
@@ -753,14 +734,14 @@ void Octopus::render() {
   }
 
   if (syncInternetTimeStep == SYNC_SHOW_RESET_SCREEN) {
-    syncInternetTimeStep = SYNC_READ_INTERNET_TIME;
+    isSyncInternetTime = true;
+    syncInternetTimeStep = (isTimeVisibled ? SYNC_READ_INTERNET_TIME : SYNC_DELAY);
   }
 }
 
 void Octopus::resetGame() {
   isShowResetScreen = false;
   gameSpeed = 50;
-  isSecondChanged = false;
   gameLoopTime = 0l;
   gameType = GAME_NONE;
   isBagVisibled = false;
@@ -952,108 +933,17 @@ void Octopus::tryAgain() {
 void Octopus::update() {
   if (syncInternetTimeStep == SYNC_READ_INTERNET_TIME) {
     syncInternetTimeStep = SYNC_DELAY;
-
-    if (isTimeVisibled) {
-      String internetTime = "";
-
-      if (wifiSSID && strlen(wifiSSID) > 0) {
-        showResetScreenTime = 0.0f;
-        espert->print("Connecting to WiFi ");
-        espert->print(wifiSSID);
-        WiFi.begin(wifiSSID, wifiPassword);
-
-        int retry = 20;
-        while (WiFi.status() != WL_CONNECTED && --retry > 0) {
-          espert->print(".");
-          delay(500);
-        }
-
-        espert->println();
-
-        if (retry > 0) {
-          espert->print("Connected, IP address: ");
-          espert->println(WiFi.localIP());
-
-          retry = 3;
-          WiFiClient client;
-          espert->println("Connecting to google.com to read current time...");
-          while (!!!client.connect("google.com", 80) && --retry > 0) {
-            espert->println("Retrying...");
-          }
-
-          if (retry > 0) {
-            client.print("HEAD / HTTP/1.1\r\n\r\n");
-
-            while (!!!client.available()) {
-              yield();
-            }
-
-            while (client.available()) {
-              if (client.read() == '\n') {
-                if (client.read() == 'D') {
-                  if (client.read() == 'a') {
-                    if (client.read() == 't') {
-                      if (client.read() == 'e') {
-                        if (client.read() == ':') {
-                          client.read();
-                          internetTime = client.readStringUntil('\r');
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } else {
-            espert->println("Failed!");
-          }
-
-          client.stop();
-          espert->println(internetTime); // ddd, dd mmm yyyy hh:mm:ss GMT
-        } else {
-          espert->println("Failed!");
-        }
-
-        WiFi.disconnect();
-      }
-
-      if (internetTime.length() > 0) {
-        String hh = internetTime.substring(17, 19);
-        String mm = internetTime.substring(20, 22);
-        String ss = internetTime.substring(23, 25);
-
-        int h = (int)timeZone;
-        int m = round((timeZone - h) * 100.0f);
-        hours = hh.toInt() + h;
-        minutes = mm.toInt() + m;
-
-        if (minutes < 0) {
-          minutes += 60;
-          hours--;
-        } else if (minutes >= 60) {
-          minutes -= 60;
-          hours++;
-        }
-
-        if (hours < 0) {
-          hours += 24;
-        } else if (hours >= 24) {
-          hours -= 24;
-        }
-
-        seconds = ss.toInt();
-      }
+    if (readInternetTime()) {
+      showResetScreenTime = 0.0f;
     }
   } else {
     if (!isPlaying) {
       if (isSoundEnabled && (isGamepadEnabled && (pressedButton == BUTTON_UP || pressedButton == BUTTON_DOWN))) {
         if (pressedButton == BUTTON_UP) {
-          volume = constrain(volume + 0.05f, 0.0f, 1.0f);
+          increaseVolume();
         } else if (pressedButton == BUTTON_DOWN) {
-          volume = constrain(volume - 0.05f, 0.0f, 1.0f);
+          decreaseVolume();
         }
-
-        isVolumeChanged = true;
       }
     }
 
@@ -1072,27 +962,6 @@ void Octopus::update() {
     } else if (syncInternetTimeStep == SYNC_FINISHED) {
       updateGameTime();
 
-      // time sync
-      unsigned long t = millis() - timeSyncLastFrameTime;
-      if (t >= 1000l) {
-        timeSyncLastFrameTime = millis() - (t - 1000l);
-        isSecondChanged = true;
-
-        if (isTimeVisibled) {
-          if (++seconds > 59) {
-            seconds = 0;
-
-            if (++minutes > 59) {
-              minutes = 0;
-
-              if (++hours > 23) {
-                hours = 0;
-              }
-            }
-          }
-        }
-      }
-
       // game loop
       if (!isShowResetScreen) {
         gameLoopTime += elapsedTime;
@@ -1103,9 +972,7 @@ void Octopus::update() {
           if (!isPlaying) {
             autoPlayScreen();
           } else {
-            if (isSecondChanged) {
-              isSecondChanged = false;
-
+            if (isSecondChanged()) {
               if (miss == 4 && ++secondCount > 3) {
                 showHighScoreTime = 0;
                 resetGame();

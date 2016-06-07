@@ -80,14 +80,6 @@ PacMan::PacMan() {
   ghostEdiblePointSize = {0, 0};
   ghostEdiblePointPosition = {0.0f, 0.0f};
   ghostEdiblePointGhost = -1;
-
-  // read data
-  gameIndex = GAME_PAC_MAN;
-  readHighScore();
-  readVolume();
-  resetGame();
-  changeGameMode(GAME_MODE_TITLE);
-  titleTime = 250.0f;
 }
 
 void PacMan::addDotCounter(int value) {
@@ -280,6 +272,15 @@ void PacMan::ghostDie(int i) {
   if (pathFinding(i, {13, 10}, false)) {
     readGhostPath(i);
   }
+}
+
+void PacMan::initGame() {
+  gameIndex = GAME_PAC_MAN;
+  readHighScore();
+  readVolume();
+  resetGame();
+  changeGameMode(GAME_MODE_TITLE);
+  titleTime = 250.0f;
 }
 
 bool PacMan::isBackToMenuEnabled() {
@@ -546,19 +547,13 @@ void PacMan::pressButton() {
             }
           }
         } else {
-          if (isSoundEnabled && ((!isGamepadEnabled && i == BUTTON_RIGHT) || (isGamepadEnabled && isVolumeChanged))) {
+          if (isSoundEnabled && ((!isGamepadEnabled && i == BUTTON_RIGHT) || (isGamepadEnabled && isVolumeChanged > 0.0f))) {
             if (!isGamepadEnabled && i == BUTTON_RIGHT) {
-              if (volume == 0.0f) {
-                volume = 1.0f;
-              } else {
-                volume = 0.0f;
-              }
+              toggleVolume();
             }
 
-            if ((!isGamepadEnabled && i == BUTTON_RIGHT) || (isGamepadEnabled && isVolumeChanged && (i == BUTTON_UP || i == BUTTON_DOWN))) {
+            if ((!isGamepadEnabled && i == BUTTON_RIGHT) || (isGamepadEnabled && isVolumeChanged > 0.0f && (i == BUTTON_UP || i == BUTTON_DOWN))) {
               titleTime = 250.0f;
-              isVolumeChanged = false;
-              writeVolume();
               playSound(SOUND_VOLUME);
             }
           } else if (i == pressedButton && (pressedButton == BUTTON_A || pressedButton == BUTTON_B)) {
@@ -1503,7 +1498,7 @@ void PacMan::updatePacMan() {
 void PacMan::updateTitle() {
   bool finished = false;
   float speed = gameNormalSpeed * 1.5f;
-  titleTime += (isVolumeChanged ? 0.0f : elapsedTime);
+  titleTime += ((isVolumeChanged > 0.0f) ? 0.0f : elapsedTime);
 
   if (isAutoPlay && titleTime > 24547.0f) {
     newLevel();
@@ -1567,13 +1562,12 @@ void PacMan::updateTitle() {
   } else if (titleTime < 5250.0f) {
     if (isSoundEnabled && (isGamepadEnabled && (pressedButton == BUTTON_UP || pressedButton == BUTTON_DOWN))) {
       if (pressedButton == BUTTON_UP) {
-        volume = constrain(volume + 0.05f, 0.0f, 1.0f);
+        increaseVolume();
       } else if (pressedButton == BUTTON_DOWN) {
-        volume = constrain(volume - 0.05f, 0.0f, 1.0f);
+        decreaseVolume();
       }
 
       titleTime = 250.0f;
-      isVolumeChanged = true;
     }
   }
 }

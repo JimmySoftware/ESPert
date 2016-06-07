@@ -3,6 +3,9 @@
 using namespace menu;
 
 Menu::Menu() {
+}
+
+void Menu::initGame() {
   game = NULL;
   currentGame = 0;
   targetGame = currentGame;
@@ -34,8 +37,7 @@ void Menu::moveRight() {
 }
 
 void Menu::playSound(int index) {
-  if (isSoundEnabled && isSoundInterruptEnabled) {
-    isSoundInterruptEnabled = false;
+  if (isSoundEnabled) {
     nextSound = SOUND_NONE;
     nextSoundDelay = 0.0f;
     int frequency = 0;
@@ -74,10 +76,8 @@ void Menu::pressButton() {
           if (isPressed) {
             pressedButton = i;
           } else {
-            if (isVolumeChanged) {
+            if (isVolumeChanged > 0.0f) {
               if (isGamepadEnabled && (i == BUTTON_UP || i == BUTTON_DOWN)) {
-                isVolumeChanged = false;
-                writeVolume();
                 playSound(SOUND_VOLUME);
               }
             } else if (i == pressedButton && targetOffset == 0.0f) {
@@ -101,7 +101,9 @@ void Menu::pressButton() {
                 }
 
                 if (game) {
-                  game->init(espert, true);
+                  bool hasMenu = true;
+                  bool syncInternetTime = false;
+                  game->init(espert, hasMenu, syncInternetTime, hours, minutes, seconds);
                   backToMenu = false;
                 }
               }
@@ -133,7 +135,7 @@ void Menu::render() {
     }
 
     if (targetOffset <= 0.0f) {
-      drawBitmap(screenSize.width - 14 - arrowOffset, 44, 16, 16, rightArrowBitmap, rightArrowMaskBitmap, ESPERT_BLACK);
+      drawBitmap(screenSize.width - 13 - arrowOffset, 44, 16, 16, rightArrowBitmap, rightArrowMaskBitmap, ESPERT_BLACK);
     }
 
     drawBitmap(58, 47, 16, 8, ofBitmap, ofMaskBitmap, ESPERT_BLACK);
@@ -169,9 +171,11 @@ void Menu::render() {
           color = ESPERT_WHITE;
           y = 52;
         }
-      }
 
-      drawBitmap(1 + arrowOffset, y, 16, 16, leftArrowBitmap, leftArrowMaskBitmap, color);
+        drawBitmap(arrowOffset, y, 32, 16, menuBitmap, menuMaskBitmap, color);
+      } else {
+        drawBitmap(arrowOffset, y, 16, 16, leftArrowBitmap, leftArrowMaskBitmap, color);
+      }
     }
   }
 
@@ -221,7 +225,7 @@ void Menu::update() {
         offset = lerp(0.4f, offset, targetOffset);
       } else {
         pressButtonTime = 500.0f;
-        offset += targetOffset * (elapsedTime / 400.0f);
+        offset += targetOffset * (elapsedTime / 300.0f);
 
         if ((targetOffset < 0.0f && offset <= targetOffset) || (targetOffset > 0.0f && offset >= targetOffset)) {
           offset = 0.0f;
@@ -237,7 +241,7 @@ void Menu::update() {
         }
       }
 
-      if (offset == targetOffset) {
+      if (pressButtonTime == 0.0f && offset == targetOffset) {
         offset = 0.0f;
         targetOffset = 0.0f;
         currentGame = targetGame;
@@ -247,12 +251,10 @@ void Menu::update() {
     // sound
     if (isSoundEnabled && isGamepadEnabled && (pressedButton == BUTTON_UP || pressedButton == BUTTON_DOWN)) {
       if (pressedButton == BUTTON_UP) {
-        volume = constrain(volume + 0.05f, 0.0f, 1.0f);
+        increaseVolume();
       } else if (pressedButton == BUTTON_DOWN) {
-        volume = constrain(volume - 0.05f, 0.0f, 1.0f);
+        decreaseVolume();
       }
-
-      isVolumeChanged = true;
     }
   }
 

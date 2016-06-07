@@ -862,13 +862,13 @@ void ESPert_OLED::setTextSize(uint8_t s) {
 
 void ESPert_OLED::setTextColor(uint16_t c) {
   if (display) {
-    display->setColor(c);
+    display->setColor((OLEDDISPLAY_COLOR)c);
   }
 }
 
 void ESPert_OLED::setColor(uint16_t c) {
   if (display) {
-    display->setColor(c);
+    display->setColor((OLEDDISPLAY_COLOR)c);
   }
 }
 
@@ -887,8 +887,8 @@ int16_t ESPert_OLED::getCursorY() {
 
 void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t color, bool drawImmediately) {
   if (display) {
-    display->setColor(color);
-    display->drawBitmap(x, y, w, h, (const char*)bitmap);
+    display->setColor((OLEDDISPLAY_COLOR)color);
+    display->drawXbm(x, y, w, h, (const char*)bitmap);
 
     if (drawImmediately) {
       display->display();
@@ -898,7 +898,7 @@ void ESPert_OLED::drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_
 
 void ESPert_OLED::drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap, bool drawImmediately) {
   if (display) {
-    display->drawBitmap(x, y, w, h, (const char*)bitmap);
+    display->drawXbm(x, y, w, h, (const char*)bitmap);
 
     if (drawImmediately) {
       display->display();

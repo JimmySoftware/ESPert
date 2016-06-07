@@ -3,17 +3,19 @@
 Game::Game() {
   gameIndex = GAME_UNKNOWN;
   isRequestingExit = false;
+  resetGameTime();
 
-  // game time
-  lastFrameTime = millis();
-  elapsedTime = 0.0f;
-  blinkTime = 0.0f;
+  // time
+  hours = 0;
+  minutes = 0;
+  seconds = 0;
+  secondsChanged = false;
+  timeSyncLastFrameTime = lastFrameTime;
+  isSyncInternetTime = false;
 
   // frame rate
   frameRate = 0;
   frameCount = 0l;
-  fpsLastFrameTime = lastFrameTime;
-  isFPSVisibled = false;
   memset(&fpsDigit, 0, sizeof(fpsDigit));
 
   // button
@@ -37,7 +39,7 @@ Game::Game() {
   nextSound = 0;
   nextSoundDelay = 0.0f;
   volume = 1.0f; // 0.0 to 1.0
-  isVolumeChanged = false;
+  isVolumeChanged = 0.0f;
   isSoundInterruptEnabled = true;
   isSoundEnabled = true;
   readVolume();
@@ -50,6 +52,11 @@ Game::Game() {
   highScore = 0l;
   score = 0l;
   highScoreAddress = -1;
+}
+
+void Game::decreaseVolume() {
+  volume = constrain(volume - (elapsedTime / 1000.0f), 0.0f, 1.0f);
+  isVolumeChanged = 1000.0f;
 }
 
 void Game::drawBitmap(int x, int y, int width, int height, const uint8_t* bitmap, const uint8_t* mask, int color) {
@@ -95,8 +102,21 @@ int Game::getHighScoreAddress() {
   return address;
 }
 
-void Game::init(ESPert* e, bool menu) {
+void Game::increaseVolume() {
+  volume = constrain(volume + (elapsedTime / 1000.0f), 0.0f, 1.0f);
+  isVolumeChanged = 1000.0f;
+}
+
+void Game::initGame() {
+}
+
+void Game::init(ESPert* e, bool menu, bool syncInternetTime, int hh, int mm, int ss) {
   isMenuEnabled = menu;
+  isSyncInternetTime = syncInternetTime;
+  hours = hh;
+  minutes = mm;
+  seconds = ss;
+
   batteryVoltage = analogRead(A0);
   isGamepadEnabled = (batteryVoltage > 5) ? true : false;
 
@@ -118,8 +138,10 @@ void Game::init(ESPert* e, bool menu) {
   }
 
   randomSeed(analogRead(0));
-  lastFrameTime = millis();
-  fpsLastFrameTime = lastFrameTime;
+  initGame();
+  resetGameTime();
+  timeSyncLastFrameTime = lastFrameTime;
+  readInternetTime();
 }
 
 bool Game::isBackToMenuEnabled() {
@@ -133,6 +155,12 @@ bool Game::isBlink(float factor) {
 
 bool Game::isExit() {
   return isRequestingExit;
+}
+
+bool Game::isSecondChanged() {
+  bool flag = secondsChanged;
+  secondsChanged = false;
+  return flag;
 }
 
 float Game::lerp(float t, float v0, float v1) {
@@ -189,6 +217,101 @@ unsigned long Game::readHighScore(int offset) {
   return highScore;
 }
 
+bool Game::readInternetTime() {
+  bool success = false;
+
+  if (isSyncInternetTime && wifiSSID && strlen(wifiSSID) > 0) {
+    String internetTime = "";
+    espert->print("Connecting to WiFi ");
+    espert->print(wifiSSID);
+    WiFi.begin(wifiSSID, wifiPassword);
+
+    int retry = 20;
+    while (WiFi.status() != WL_CONNECTED && --retry > 0) {
+      espert->print(".");
+      delay(500);
+    }
+
+    espert->println();
+
+    if (retry > 0) {
+      espert->print("Connected, IP address: ");
+      espert->println(WiFi.localIP());
+
+      retry = 3;
+      WiFiClient client;
+      espert->println("Connecting to google.com to read current time...");
+      while (!!!client.connect("google.com", 80) && --retry > 0) {
+        espert->println("Retrying...");
+      }
+
+      if (retry > 0) {
+        client.print("HEAD / HTTP/1.1\r\n\r\n");
+
+        while (!!!client.available()) {
+          yield();
+        }
+
+        while (client.available()) {
+          if (client.read() == '\n') {
+            if (client.read() == 'D') {
+              if (client.read() == 'a') {
+                if (client.read() == 't') {
+                  if (client.read() == 'e') {
+                    if (client.read() == ':') {
+                      client.read();
+                      internetTime = client.readStringUntil('\r');
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        espert->println("Failed!");
+      }
+
+      client.stop();
+      espert->println(internetTime); // ddd, dd mmm yyyy hh:mm:ss GMT
+    } else {
+      espert->println("Failed!");
+    }
+
+    WiFi.disconnect();
+    success = true;
+
+    if (internetTime.length() > 0) {
+      String hh = internetTime.substring(17, 19);
+      String mm = internetTime.substring(20, 22);
+      String ss = internetTime.substring(23, 25);
+
+      int h = (int)timeZone;
+      int m = round((timeZone - h) * 100.0f);
+      hours = hh.toInt() + h;
+      minutes = mm.toInt() + m;
+
+      if (minutes < 0) {
+        minutes += 60;
+        hours--;
+      } else if (minutes >= 60) {
+        minutes -= 60;
+        hours++;
+      }
+
+      if (hours < 0) {
+        hours += 24;
+      } else if (hours >= 24) {
+        hours -= 24;
+      }
+
+      seconds = ss.toInt();
+    }
+  }
+
+  return success;
+}
+
 void Game::readVolume() {
   if (espert->eeprom.read(0, saveDataKey.length()) == saveDataKey) {
     String data = espert->eeprom.read(saveDataKey.length(), volumeLength);
@@ -225,7 +348,7 @@ void Game::renderBattery(int x, int y, int color) {
       String string = String(round(batteryVoltage));
       display->setColor(color);
       display->drawString(x - 1 - display->getStringWidth(string), y - 3, string);
-    }*/
+      }*/
 
     drawBitmap(x, y, 16, 8, batteryBitmap, NULL, color);
 
@@ -275,11 +398,23 @@ void Game::resetGameTime() {
   fpsLastFrameTime = lastFrameTime;
 }
 
+void Game::toggleVolume() {
+  if (volume == 0.0f) {
+    volume = 1.0f;
+  } else {
+    volume = 0.0f;
+  }
+
+  isVolumeChanged = 1000.0f;
+}
+
 void Game::updateGameTime(bool updateButton) {
   // game time
   unsigned long frameTime = millis();
   elapsedTime = frameTime - lastFrameTime;
   lastFrameTime = frameTime;
+
+  updateInternetTime();
 
   // frame rate
   frameCount++;
@@ -329,6 +464,35 @@ void Game::updateGameTime(bool updateButton) {
       }
     }
   }
+
+  // volume
+  if (isVolumeChanged > 0.0f) {
+    isVolumeChanged -= elapsedTime;
+    if (isVolumeChanged <= 0.0f) {
+      isVolumeChanged = 0.0f;
+      writeVolume();
+    }
+  }
+}
+
+void Game::updateInternetTime() {
+  unsigned long t = millis() - timeSyncLastFrameTime;
+  if (t >= 1000l) {
+    timeSyncLastFrameTime = millis() - (t - 1000l);
+    secondsChanged = true;
+
+    if (++seconds > 59) {
+      seconds = 0;
+
+      if (++minutes > 59) {
+        minutes = 0;
+
+        if (++hours > 23) {
+          hours = 0;
+        }
+      }
+    }
+  }
 }
 
 void Game::writeHighScore(int offset) {
@@ -343,4 +507,5 @@ void Game::writeHighScore(int offset) {
 
 void Game::writeVolume() {
   espert->eeprom.write(saveDataKey.length(), floatToString(volume, volumeLength, 2));
+  isVolumeChanged = 0.0f;
 }
