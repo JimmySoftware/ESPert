@@ -641,6 +641,7 @@ class FlappyBird : public Game {
     void jump();
     void playSound(int index);
     void pressButton();
+    void renderHighScore();
     void resetBird();
     void resetGame();
     void setScoreImages();

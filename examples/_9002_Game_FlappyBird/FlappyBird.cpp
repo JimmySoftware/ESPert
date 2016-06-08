@@ -293,7 +293,8 @@ void FlappyBird::render() {
   switch (gameMode) {
     case GAME_MODE_TITLE:
       drawBitmap(32, 1, 72, 24, titleBitmap, titleMaskBitmap, ESPERT_BLACK);
-      renderMakerAsia(40, 50, ESPERT_BLACK);
+      renderMakerAsia(40, 51, ESPERT_BLACK);
+      renderHighScore();
       drawBitmap(birdPosition.x, birdPosition.y, 16, 16, birdBitmap[(int)birdFrame][(int)birdDegrees], birdMaskBitmap[(int)birdFrame][(int)birdDegrees], ESPERT_BLACK);
       break;
 
@@ -357,6 +358,19 @@ void FlappyBird::render() {
 
   if (!isMenuEnabled) {
     espert->oled.update();
+  }
+}
+
+void FlappyBird::renderHighScore() {
+  drawBitmap(49, 38, 32, 8, highScoreBitmap, NULL, ESPERT_BLACK);
+  String highScoreString = String(highScore);
+  int numberwidth = 7;
+  int x = (screenSize.width - (highScoreString.length() * (numberwidth - 1))) * 0.5f;
+  int n = 0;
+
+  for (int i = 0; i < highScoreString.length(); i++) {
+    n = highScoreString.charAt(i) - '0';
+    drawBitmap(x + (i * (numberwidth - 1)), 45, 8, 8, numberBitmap[n], numberMaskBitmap[n], ESPERT_BLACK);
   }
 }
 

@@ -564,12 +564,7 @@ void Breakout::render() {
   switch (gameMode) {
     case GAME_MODE_TITLE:
     case GAME_MODE_TITLE_BLINK:
-      drawBitmap(49, 41, 32, 8, highScoreBitmap);
-
-      for (int i = 0; i < 4; i++) {
-        espert->oled.drawBitmap(56 + (i * 4), 48, 8, 8, highScoreDigitImage[i], false);
-      }
-
+      renderHighScore();
       renderVolume(0, 0);
       renderBattery(screenSize.width - batterySize.width, 0);
       renderMakerAsia(40, 54);
@@ -660,6 +655,19 @@ void Breakout::render() {
 
   if (!isMenuEnabled) {
     espert->oled.update();
+  }
+}
+
+void Breakout::renderHighScore() {
+  drawBitmap(49, 41, 32, 8, highScoreBitmap);
+  String highScoreString = String(highScore);
+  int numberwidth = 5;
+  int x = (screenSize.width - (highScoreString.length() * (numberwidth - 1))) * 0.5f;
+  int n = 0;
+
+  for (int i = 0; i < highScoreString.length(); i++) {
+    n = highScoreString.charAt(i) - '0';
+    drawBitmap(x + (i * (numberwidth - 1)), 48, 8, 8, numberBitmap[n]);
   }
 }
 

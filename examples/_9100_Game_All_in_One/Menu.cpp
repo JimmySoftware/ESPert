@@ -155,6 +155,7 @@ void Menu::render() {
     }
 
     renderVolume(1, 1, ESPERT_BLACK);
+    //renderBattery(screenSize.width - batterySize.width - 1, 1, ESPERT_BLACK, 8, 8, -3, (const uint8_t*)numberBitmap, (const uint8_t*)numberMaskBitmap);
     renderBattery(screenSize.width - batterySize.width - 1, 1, ESPERT_BLACK);
     renderFPS(116, 56, 8, 8, -3, (const uint8_t*)numberBitmap, (const uint8_t*)numberMaskBitmap, ESPERT_BLACK, 102, 56);
   }

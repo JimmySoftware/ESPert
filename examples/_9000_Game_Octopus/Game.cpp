@@ -84,6 +84,21 @@ Game::GameIndex Game::getGameIndex() {
   return gameIndex;
 }
 
+int Game::getBatteryVoltage() {
+  static int filters[batteryMaxValues] = {0};
+  static int lastIndex = 0;
+  static float filterAvg = 0;
+
+  int val = analogRead(A0);
+  if (val > 5) {
+    filters[lastIndex++ % batteryMaxValues] = val;
+    val = median(filters, batteryMaxValues);
+    filterAvg = (filterAvg + val) / 2;
+  }
+
+  return map(filterAvg, 0, 1023, 0, batteryMaxVoltage);
+}
+
 int Game::getHighScoreAddress() {
   int address = -1;
 
@@ -91,10 +106,12 @@ int Game::getHighScoreAddress() {
     address = saveDataHeaderSize;
 
     for (int i = numberOfGames - 1; i > gameIndex; i--) {
-      address += String(maxScore[i]).length();
+      int length = String(maxScore[i]).length() + 1;
 
       if (i == GAME_OCTOPUS) {
-        address += String(maxScore[i]).length(); // game B
+        address += length * 2; // game A + game B
+      } else {
+        address += length;
       }
     }
   }
@@ -107,18 +124,25 @@ void Game::increaseVolume() {
   isVolumeChanged = 1000.0f;
 }
 
+void Game::initBattery() {
+  for (int i = 0; i < batteryMaxValues; ++i) {
+    getBatteryVoltage();
+  }
+}
+
 void Game::initGame() {
 }
 
 void Game::init(ESPert* e, bool menu, bool syncInternetTime, int hh, int mm, int ss) {
+  initBattery();
+
   isMenuEnabled = menu;
   isSyncInternetTime = syncInternetTime;
   hours = hh;
   minutes = mm;
   seconds = ss;
 
-  batteryVoltage = analogRead(A0);
-  isGamepadEnabled = (batteryVoltage > 5) ? true : false;
+  isGamepadEnabled = (analogRead(A0) > 5) ? true : false;
 
   espert = e;
   espert->oled.init();
@@ -184,10 +208,53 @@ String Game::longToString(unsigned long value, int length, String prefixChar) {
   return prefix + stringValue;
 }
 
+int Game::median(int arr[], int maxValues) {
+  quickSort(arr, 0, maxValues - 1);
+  return arr[maxValues / 2];
+}
+
+int Game::partition(int* arr, const int left, const int right) {
+  const int mid = left + (right - left) / 2;
+  const int pivot = arr[mid];
+
+  // move the mid point value to the front.
+  swap(arr[mid], arr[left]);
+  int i = left + 1;
+  int j = right;
+
+  while (i <= j) {
+    while (i <= j && arr[i] <= pivot) {
+      i++;
+    }
+
+    while (i <= j && arr[j] > pivot) {
+      j--;
+    }
+
+    if (i < j) {
+      swap(arr[i], arr[j]);
+    }
+  }
+
+  swap(arr[i - 1], arr[left]);
+  return i - 1;
+}
+
 void Game::playSound(int index) {
 }
 
 void Game::pressButton() {
+}
+
+void Game::quickSort(int* arr, const int left, const int right) {
+  if (left >= right) {
+    return;
+  }
+
+  int part = partition(arr, left, right);
+
+  quickSort(arr, left, part - 1);
+  quickSort(arr, part + 1, right);
 }
 
 unsigned long Game::readHighScore(int offset) {
@@ -196,7 +263,7 @@ unsigned long Game::readHighScore(int offset) {
       highScoreAddress = getHighScoreAddress();
 
       if (highScoreAddress != -1) {
-        String data = espert->eeprom.read(highScoreAddress + offset, String(maxScore[gameIndex]).length());
+        String data = espert->eeprom.read(highScoreAddress + (offset > 0 ? 1 : 0) + offset, String(maxScore[gameIndex]).length());
         highScore = data.toInt();
         if (highScore < 0l || highScore > maxScore[gameIndex]) {
           highScore = constrain(highScore, 0, maxScore[gameIndex]);
@@ -314,7 +381,7 @@ bool Game::readInternetTime() {
 
 void Game::readVolume() {
   if (espert->eeprom.read(0, saveDataKey.length()) == saveDataKey) {
-    String data = espert->eeprom.read(saveDataKey.length(), volumeLength);
+    String data = espert->eeprom.read(saveDataKey.length() + 1, saveDataVolumeLength);
     volume = data.toFloat();
     if (volume < 0.0f || volume > 1.0f) {
       volume = constrain(volume, 0.0f, 1.0f);
@@ -334,21 +401,21 @@ void Game::readVolume() {
 void Game::render() {
 }
 
-void Game::renderBattery(int x, int y, int color) {
+void Game::renderBattery(int x, int y, int color, int bitmapWidth, int bitmapHeight, int gap, const uint8_t* numberBitmap, const uint8_t* numberMaskBitmap) {
   if (isGamepadEnabled) {
-    int batteryRead = analogRead(A0);
+    batteryVoltage = getBatteryVoltage();
+    battery = constrain(batteryVoltage / batteryMaxVoltage, 0.0f, 1.0f);
 
-    if (batteryRead > 5) {
-      batteryVoltage = lerp(0.01f, batteryVoltage, batteryRead);
-      battery = constrain(batteryVoltage / 1024.0f, 0.0f, 1.0f);
-    }
-
-    /*if (gameIndex == GAME_UNKNOWN) {
-      SSD1306* display = espert->oled.getDisplay();
+    if (numberBitmap != NULL) {
       String string = String(round(batteryVoltage));
-      display->setColor(color);
-      display->drawString(x - 1 - display->getStringWidth(string), y - 3, string);
-      }*/
+      int width = bitmapWidth + gap;
+      int offset = x - 1 - (string.length() * width);
+
+      for (int i = 0; i < string.length(); i++) {
+        int n = string.charAt(i) - '0';
+        drawBitmap(offset + (i * width), y, bitmapWidth, bitmapHeight, numberBitmap + (n * bitmapWidth), numberMaskBitmap + (n * bitmapWidth), ESPERT_BLACK);
+      }
+    }
 
     drawBitmap(x, y, 16, 8, batteryBitmap, NULL, color);
 
@@ -396,6 +463,12 @@ void Game::resetGameTime() {
   elapsedTime = 0.0f;
   blinkTime = 0.0f;
   fpsLastFrameTime = lastFrameTime;
+}
+
+void Game::swap(int &a, int &b) {
+  int t = a;
+  a = b;
+  b = t;
 }
 
 void Game::toggleVolume() {
@@ -500,12 +573,12 @@ void Game::writeHighScore(int offset) {
     highScoreAddress = getHighScoreAddress();
 
     if (highScoreAddress != -1) {
-      espert->eeprom.write(highScoreAddress + offset, longToString(highScore, String(maxScore[gameIndex]).length(), "0"));
+      espert->eeprom.write(highScoreAddress + (offset > 0 ? 1 : 0) + offset, longToString(highScore, String(maxScore[gameIndex]).length(), "0"));
     }
   }
 }
 
 void Game::writeVolume() {
-  espert->eeprom.write(saveDataKey.length(), floatToString(volume, volumeLength, 2));
+  espert->eeprom.write(saveDataKey.length() + 1, floatToString(volume, saveDataVolumeLength, 2));
   isVolumeChanged = 0.0f;
 }
