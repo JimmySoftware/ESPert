@@ -509,7 +509,7 @@ void Breakout::pressButton() {
       bool isPressed = false;
 
       if (buttonPin[i] == A0) {
-        isPressed = (analogRead(buttonPin[i]) > 5) ? false : true;
+        isPressed = (batteryA0Value >= batteryA0Min) ? false : true;
       } else {
         isPressed = (digitalRead(buttonPin[i]) == LOW) ? true : false;
       }

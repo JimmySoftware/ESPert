@@ -46,7 +46,9 @@ Game::Game() {
 
   // battery
   battery = 0.0f; // 0.0 to 1.0
-  batteryVoltage = 0.0f;
+  batteryVoltage = 0;
+  lastBatteryVoltage = -1;
+  batteryA0Value = batteryA0Min;
 
   // score
   highScore = 0l;
@@ -85,18 +87,15 @@ Game::GameIndex Game::getGameIndex() {
 }
 
 int Game::getBatteryVoltage() {
-  static int filters[batteryMaxValues] = {0};
-  static int lastIndex = 0;
-  static float filterAvg = 0;
+  batteryA0Value = analogRead(A0);
 
-  int val = analogRead(A0);
-  if (val > 5) {
-    filters[lastIndex++ % batteryMaxValues] = val;
-    val = median(filters, batteryMaxValues);
-    filterAvg = (filterAvg + val) / 2;
+  if (batteryA0Value > batteryA0Min) {
+    batteryFilters[batteryFiltersIndex++ % batteryMaxValues] = batteryA0Value;
+    batteryA0Value = median(batteryFilters, batteryMaxValues);
+    batteryVoltage = map(batteryA0Value, 0, 1023, 0, batteryMaxVoltage);
   }
 
-  return map(filterAvg, 0, 1023, 0, batteryMaxVoltage);
+  return batteryVoltage;
 }
 
 int Game::getHighScoreAddress() {
@@ -134,15 +133,13 @@ void Game::initGame() {
 }
 
 void Game::init(ESPert* e, bool menu, bool syncInternetTime, int hh, int mm, int ss) {
-  initBattery();
-
   isMenuEnabled = menu;
   isSyncInternetTime = syncInternetTime;
   hours = hh;
   minutes = mm;
   seconds = ss;
 
-  isGamepadEnabled = (analogRead(A0) > 5) ? true : false;
+  isGamepadEnabled = (analogRead(A0) > batteryA0Min) ? true : false;
 
   espert = e;
   espert->oled.init();
@@ -166,6 +163,8 @@ void Game::init(ESPert* e, bool menu, bool syncInternetTime, int hh, int mm, int
   resetGameTime();
   timeSyncLastFrameTime = lastFrameTime;
   readInternetTime();
+
+  initBattery();
 }
 
 bool Game::isBackToMenuEnabled() {
@@ -403,11 +402,14 @@ void Game::render() {
 
 void Game::renderBattery(int x, int y, int color, int bitmapWidth, int bitmapHeight, int gap, const uint8_t* numberBitmap, const uint8_t* numberMaskBitmap) {
   if (isGamepadEnabled) {
-    batteryVoltage = getBatteryVoltage();
-    battery = constrain(batteryVoltage / batteryMaxVoltage, 0.0f, 1.0f);
+    if (getBatteryVoltage() != lastBatteryVoltage) {
+      lastBatteryVoltage = batteryVoltage;
+      battery = constrain(((float)batteryVoltage - batteryVoltageMin) / batteryVoltageLength, 0.0f, 1.0f);
+      espert->println(String(millis()) + ": Battery Voltage = " + String(batteryVoltage));
+    }
 
     if (numberBitmap != NULL) {
-      String string = String(round(batteryVoltage));
+      String string = String(batteryVoltage);
       int width = bitmapWidth + gap;
       int offset = x - 1 - (string.length() * width);
 

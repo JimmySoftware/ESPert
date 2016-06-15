@@ -70,7 +70,7 @@ class Game {
   public:
     // ****************************************************************************
     // EEPROM
-    // ****************************************************************************
+    // ****************************************************************************i
     //               saveDataHeaderSize (32)           highScore
     //          ┌───────────────┴──────────────┐┌──────────┴──────────┐
     // Address: 0123456789012345678901234567890123456789012345678901234567890123456
@@ -166,11 +166,19 @@ class Game {
     bool isSoundEnabled = true;
 
     // battery
-    static const int batteryMaxValues = 15;
-    static const int batteryMaxVoltage = 6200;
+    static const int batteryA0Min = 5;
+    static const int batteryMaxVoltage = 6080;
+    static const int batteryVoltageMin = 3000;
+    static const int batteryVoltageMax = 4225;
+    static const int batteryVoltageLength = batteryVoltageMax - batteryVoltageMin + 1;
+    static const int batteryMaxValues = 21;
+    int batteryFilters[batteryMaxValues];
+    int batteryFiltersIndex = 0;
+    int batteryA0Value;
+    int lastBatteryVoltage;
+    int batteryVoltage;
     const Size batterySize = {15, 8};
     float battery;
-    float batteryVoltage;
 
     // score
     unsigned long highScore;
