@@ -412,16 +412,21 @@ class ESPert_OTA {
   private:
     bool _initialised = false;
   public:
-    OTA_CALLBACK(_user_on_start_callback) = NULL;
-    OTA_CALLBACK(_user_on_end_callback) = NULL;
-    OTA_CALLBACK_ERROR(_user_on_error_callback) = NULL;
-    OTA_CALLBACK_PROGRESS(_user_on_progress_callback) = NULL;
+    typedef std::function<void(void)> THandlerFunction;
+    typedef std::function<void(ota_error_t)> THandlerFunction_Error;
+    typedef std::function<void(unsigned int, unsigned int)> THandlerFunction_Progress;
+
+    THandlerFunction _user_on_start_callback;
+    THandlerFunction _user_on_end_callback;
+    THandlerFunction_Error _user_on_error_callback;
+    THandlerFunction_Progress _user_on_progress_callback;
+
 
     void loop();
-    void on_start(OTA_CALLBACK(fn));
-    void on_end(OTA_CALLBACK(fn));
-    void on_progress(OTA_CALLBACK_PROGRESS(fn));
-    void on_error(OTA_CALLBACK_ERROR(fn));
+    void on_start(THandlerFunction fn);
+    void on_end(THandlerFunction fn);
+    void on_progress(THandlerFunction_Progress fn);
+    void on_error(THandlerFunction_Error fn);
 
     ESPert_OTA* init();
     bool enabled();

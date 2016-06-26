@@ -1923,19 +1923,19 @@ bool ESPert_OTA::enabled() {
   return _initialised;
 }
 
-void ESPert_OTA::on_start(OTA_CALLBACK(fn)) {
+void ESPert_OTA::on_start(THandlerFunction fn) {
   _user_on_start_callback = fn;
 }
 
-void ESPert_OTA::on_end(OTA_CALLBACK(fn)) {
+void ESPert_OTA::on_end(THandlerFunction fn) {
   _user_on_end_callback = fn;
 }
 
-void ESPert_OTA::on_progress(OTA_CALLBACK_PROGRESS(fn)) {
+void ESPert_OTA::on_progress(THandlerFunction_Progress fn) {
   _user_on_progress_callback = fn;
 }
 
-void ESPert_OTA::on_error(OTA_CALLBACK_ERROR(fn)) {
+void ESPert_OTA::on_error(THandlerFunction_Error fn) {
   _user_on_error_callback = fn;
 }
 
