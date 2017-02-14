@@ -6,7 +6,7 @@ Please proceed to follow the procedures as prescribed in the ESPresso Lite tutor
 
 # Setup
 ## Arduino Software
-- Install Arduino 1.6.8 from https://www.arduino.cc/en/Main/Software
+- Install Arduino 1.8.1 from https://www.arduino.cc/en/Main/Software
 
 ## ESP8266 Board Manager
 - Start Arduino and open Preference
@@ -16,13 +16,13 @@ Please proceed to follow the procedures as prescribed in the ESPresso Lite tutor
 
 ## Install dependency for ESPert
 Open Library Manager (menu Sketch > Include Library > Manage Libraries…) then install the following libraries
-- ESPert by Jimmy (current version 1.2.4)
-- DHT sensor library by Adafruit (current version 1.2.3)
+- ESPert by Jimmy (current version 1.3.0)
+- DHT sensor library by Adafruit (current version 1.2.3) *
 - PubSubClient by Nick O'Leary (current version 2.6.0)
-- ArduinoJson by Benoit Blanchon (current version 5.2.0)
+- ArduinoJson by Benoit Blanchon (current version 5.8.3) 
 - HttpClient by Adrian McEwen (current version 2.2.0)
-- ESP8266 Oled Driver for SSD1306 display by Daniel Eichborn, Fabrice Weinberg (current version 2.0.2)
-- Adafruit NeoPixel by Adafruit (current version 1.0.5)
+- ESP8266 Oled Driver for SSD1306 display by Daniel Eichborn, Fabrice Weinberg (current version 3.2.5) 
+- Adafruit NeoPixel by Adafruit (current version 1.0.6) 
 
 ## Run examples from ESPert
 - Open Arduino IDE, try examples of ESPert library

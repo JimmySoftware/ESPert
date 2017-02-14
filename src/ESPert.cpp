@@ -1,6 +1,6 @@
 #include "ESPert.h"
 
-const float ESPERT_LIBRARY_VERSION = 0.10f;
+const float ESPERT_LIBRARY_VERSION = 1.30f;
 
 int ESPertBoardType = ESPERT_BOARD_ESPRESSO_LITE2; // default
 
