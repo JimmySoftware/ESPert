@@ -60,8 +60,7 @@ env:
     - PLATFORMIO_CI_SRC=examples/_9000_Game_Octopus
 install:
    - pip install -U platformio
-   - platformio lib install 19 31 28 64 66 89 562
-
+    - platformio lib -g install 19 31 28 64 66 89 562
 
 script:
    - python extras/extra_ci.py
