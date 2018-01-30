@@ -66,4 +66,4 @@ install:
 script:
    - python extras/extra_ci.py
    - find .
-   - platformio ci --board=espresso_lite_v2 --lib="."
+   - platformio ci --project-option="lib_ldf_mode=2" --board=espresso_lite_v2 --lib="."
