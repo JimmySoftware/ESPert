@@ -6,20 +6,20 @@
 # Datatypes (KEYWORD1)
 #######################################
 
-ESPert		KEYWORD1	ESPert
-oled		KEYWORD1	oled
-ble			KEYWORD1	ble	
-button		KEYWORD1	button
-dht			KEYWORD1	dht
-eeprom		KEYWORD1	eeprom
-grove		KEYWORD1	grove
-info		KEYWORD1	info
-json		KEYWORD1	json
-led			KEYWORD1	led
-mqtt		KEYWORD1	mqtt
+ESPert	KEYWORD1	ESPert
+oled	KEYWORD1	oled
+ble	KEYWORD1	ble	
+button	KEYWORD1	button
+dht	KEYWORD1	dht
+eeprom	KEYWORD1	eeprom
+grove	KEYWORD1	grove
+info	KEYWORD1	info
+json	KEYWORD1	json
+led	KEYWORD1	led
+mqtt	KEYWORD1	mqtt
 swSerial	KEYWORD1	swSerial
-wifi		KEYWORD1	wifi
-buzzer		KEYWORD1	buzzer
+wifi	KEYWORD1	wifi
+buzzer	KEYWORD1	buzzer
 neopixel	KEYWORD1	neopixel
 
 
@@ -28,41 +28,41 @@ neopixel	KEYWORD1	neopixel
 # Methods and Functions (KEYWORD2)
 #######################################
 ESPERT_WIFI_MODE_DISCONNECT	LITERAL1
-begin						KEYWORD2
-init						KEYWORD2
-off							KEYWORD2
-on							KEYWORD2
-isOn						KEYWORD2
+begin	KEYWORD2
+init	KEYWORD2
+off	KEYWORD2
+on	KEYWORD2
+isOn	KEYWORD2
 
 #ESPert_Info
-getId						KEYWORD2
-getLibraryVersion			KEYWORD2
-getFreeHeap					KEYWORD2
-getChipId					KEYWORD2
-getFlashChipId				KEYWORD2
-getFlashChipInfo			KEYWORD2
-getFlashChipRealSize		KEYWORD2
-getFlashChipSize			KEYWORD2
-getFlashChipSpeed			KEYWORD2
+getId	KEYWORD2
+getLibraryVersion	KEYWORD2
+getFreeHeap	KEYWORD2
+getChipId	KEYWORD2
+getFlashChipId	KEYWORD2
+getFlashChipInfo	KEYWORD2
+getFlashChipRealSize	KEYWORD2
+getFlashChipSize	KEYWORD2
+getFlashChipSpeed	KEYWORD2
 getFlashChipSizeByChipId	KEYWORD2
 
 #ESPert_WiFi
-init						KEYWORD2
-getMode						KEYWORD2
-setAutoConnect				KEYWORD2
-smartConfig					KEYWORD2
-initSetupAP					KEYWORD2
-initSetupServer				KEYWORD2
-test						KEYWORD2
-disconnect					KEYWORD2
-getLocalIP					KEYWORD2
-getAPIP						KEYWORD2
-getHTTP						KEYWORD2
+init	KEYWORD2
+getMode	KEYWORD2
+setAutoConnect	KEYWORD2
+smartConfig	KEYWORD2
+initSetupAP	KEYWORD2
+initSetupServer	KEYWORD2
+test	KEYWORD2
+disconnect	KEYWORD2
+getLocalIP	KEYWORD2
+getAPIP	KEYWORD2
+getHTTP	KEYWORD2
 
 #DHT
-isReady						KEYWORD2
-getHumidity					KEYWORD2
-getTemperature				KEYWORD2
+isReady	KEYWORD2
+getHumidity	KEYWORD2
+getTemperature	KEYWORD2
 
 
 
@@ -71,18 +71,18 @@ getTemperature				KEYWORD2
 # Constants (LITERAL1)
 #######################################
 
-ESPERT_WIFI_MODE_DISCONNECT		LITERAL1
-ESPERT_WIFI_MODE_CONNECT		LITERAL1
+ESPERT_WIFI_MODE_DISCONNECT	LITERAL1
+ESPERT_WIFI_MODE_CONNECT	LITERAL1
 ESPERT_WIFI_MODE_SMARTCONFIG	LITERAL1
-ESPERT_WIFI_MODE_SETTINGAP		LITERAL1
+ESPERT_WIFI_MODE_SETTINGAP	LITERAL1
 
-ESPERT_BOARD_GENERIC			LITERAL1
-ESPERT_BOARD_ESP201				LITERAL1
-ESPERT_BOARD_ESPRESSO_LITE1		LITERAL1
-ESPERT_BOARD_ESPRESSO_LITE2		LITERAL1
+ESPERT_BOARD_GENERIC	LITERAL1
+ESPERT_BOARD_ESP201	LITERAL1
+ESPERT_BOARD_ESPRESSO_LITE1	LITERAL1
+ESPERT_BOARD_ESPRESSO_LITE2	LITERAL1
 
-ESPERT_PIN_BUTTON				LITERAL1
-ESPERT_PIN_SDA   				LITERAL1
-ESPERT_PIN_SCL   				LITERAL1
-ESPERT_PIN_DHT   				LITERAL1
-ESPERT_DHT_TYPE  				LITERAL1
+ESPERT_PIN_BUTTON	LITERAL1
+ESPERT_PIN_SDA	LITERAL1
+ESPERT_PIN_SCL	LITERAL1
+ESPERT_PIN_DHT	LITERAL1
+ESPERT_DHT_TYPE	LITERAL1
