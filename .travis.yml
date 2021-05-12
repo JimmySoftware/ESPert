@@ -34,30 +34,30 @@ cache:
        - "~/.platformio"
 
 env:
-    - PLATFORMIO_CI_SRC=examples/_0010_Blink
-    - PLATFORMIO_CI_SRC=examples/_0012_ADC
-    - PLATFORMIO_CI_SRC=examples/_0020_BlinkESPert
-    - PLATFORMIO_CI_SRC=examples/_0030_BoardInfo
-    - PLATFORMIO_CI_SRC=examples/_0040_Button
-    - PLATFORMIO_CI_SRC=examples/_0050_OLED
-    - PLATFORMIO_CI_SRC=examples/_0060_DHT
-    - PLATFORMIO_CI_SRC=examples/_0070_SmartConfig
-    - PLATFORMIO_CI_SRC=examples/_0080_WebServer
-    - PLATFORMIO_CI_SRC=examples/_0090_Ajax
-    - PLATFORMIO_CI_SRC=examples/_0100_HttpGet
-    - PLATFORMIO_CI_SRC=examples/_0110_ButtonToPushMessage
-    - PLATFORMIO_CI_SRC=examples/_0130_MQTT_Button
-    - PLATFORMIO_CI_SRC=examples/_0140_MQTT_DHT
-    - PLATFORMIO_CI_SRC=examples/_0150_MQTT_LED
-    - PLATFORMIO_CI_SRC=examples/_0160_Time_SNTP
-    - PLATFORMIO_CI_SRC=examples/_1000_Buzzer
-    - PLATFORMIO_CI_SRC=examples/_1010_MQTT_LED_Buzzer
-    - PLATFORMIO_CI_SRC=examples/_1020_PIR
-    - PLATFORMIO_CI_SRC=examples/_1030_ExternalButton
-    - PLATFORMIO_CI_SRC=examples/_1040_Sleep
-    - PLATFORMIO_CI_SRC=examples/_2000_ESPert_workshop
-    - PLATFORMIO_CI_SRC=examples/_3001_NeoPixel
-    - PLATFORMIO_CI_SRC=examples/_9000_Game_Octopus
+    - PLATFORMIO_CI_SRC=examples/0010_Blink
+    - PLATFORMIO_CI_SRC=examples/0012_ADC
+    - PLATFORMIO_CI_SRC=examples/0020_BlinkESPert
+    - PLATFORMIO_CI_SRC=examples/0030_BoardInfo
+    - PLATFORMIO_CI_SRC=examples/0040_Button
+    - PLATFORMIO_CI_SRC=examples/0050_OLED
+    - PLATFORMIO_CI_SRC=examples/0060_DHT
+    - PLATFORMIO_CI_SRC=examples/0070_SmartConfig
+    - PLATFORMIO_CI_SRC=examples/0080_WebServer
+    - PLATFORMIO_CI_SRC=examples/0090_Ajax
+    - PLATFORMIO_CI_SRC=examples/0100_HttpGet
+    - PLATFORMIO_CI_SRC=examples/0110_ButtonToPushMessage
+    - PLATFORMIO_CI_SRC=examples/0130_MQTT_Button
+    - PLATFORMIO_CI_SRC=examples/0140_MQTT_DHT
+    - PLATFORMIO_CI_SRC=examples/0150_MQTT_LED
+    - PLATFORMIO_CI_SRC=examples/0160_Time_SNTP
+    - PLATFORMIO_CI_SRC=examples/1000_Buzzer
+    - PLATFORMIO_CI_SRC=examples/1010_MQTT_LED_Buzzer
+    - PLATFORMIO_CI_SRC=examples/1020_PIR
+    - PLATFORMIO_CI_SRC=examples/1030_ExternalButton
+    - PLATFORMIO_CI_SRC=examples/1040_Sleep
+    - PLATFORMIO_CI_SRC=examples/2000_ESPert_workshop
+    - PLATFORMIO_CI_SRC=examples/3001_NeoPixel
+    - PLATFORMIO_CI_SRC=examples/9000_Game_Octopus
 install:
    - pip install -U platformio
    - platformio upgrade
